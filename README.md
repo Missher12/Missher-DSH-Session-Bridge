@@ -29,7 +29,7 @@ dsh plugin add link:/Users/missher/Documents/Projects/04-Harness-Plugins/dsh-ses
 
 宿主模块热更新和客户端 bundle 热更新是两条链路。桌面 `hmr.root: []` 禁止宿主代码监听；开发时可显式监听本插件 `lib/`，或在构建后重启应用。已经进入 boot graph 的客户端 bundle 由 `client-hmr` 独立监听。
 
-DSH 0.1.7-rc.2 原版还会跨 Loader 行重载保留 `dsh.client` 正面/负面元数据缓存。新增客户端声明、调整依赖后，重启进程才可靠；本次提供的上游补丁在 Loader 行事件时失效对应缓存，不会自动监听 package.json。补丁只改源码不会影响正在运行的 app.asar。已有 `session-bridge-dev` 改名配置应在停机后移除再重启，正常的 Bundle 依赖和原始行应保留。具体命令和本次证据见 [REPAIR_REPORT.md](REPAIR_REPORT.md)。
+DSH 0.1.7-rc.2 原版还会跨 Loader 行重载保留 `dsh.client` 正面/负面元数据缓存。新增客户端声明、调整依赖后，重启进程才可靠；本次提供的上游补丁在 Loader 行事件时失效对应缓存，不会自动监听 package.json。补丁只改源码不会影响正在运行的 app.asar。安装正式 tgz 前必须撤销旧的 `session-bridge-dev` 改名配置，正常的 Bundle 依赖和原始行应保留；两行一起启用会重复注册工具。现场已通过 HMR 分两步完成清理（先禁用正式行并移除开发行，待旧实例释放后启用正式行），无需重启；配置备份和实测记录见 HANDOVER.md。具体命令和本次证据见 [REPAIR_REPORT.md](REPAIR_REPORT.md)。
 
 pnpm 11 的设置在 `pnpm-workspace.yaml`，使用 `allowBuilds.esbuild: true`；不再编辑 `node_modules/.modules.yaml`。本项目锁定 pnpm 11.1.3，宿主 checkout 自己的 11.7.0 不变。
 
