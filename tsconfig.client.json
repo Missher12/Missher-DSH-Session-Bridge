@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["react"],
+    "jsx": "react-jsx",
+    "declaration": false,
+    "noEmit": true
+  },
+  "include": ["src/client", "src/scratch-wire.ts"],
+  "exclude": []
+}

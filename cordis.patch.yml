@@ -1,0 +1,15 @@
+# dsh-session-bridge — mounts the session plugin into a profile layer stack.
+#
+# Runtime defaults live at the plugin's own config boundary (every field is
+# optional and defaulted). Override them in the profile patch row with the same
+# id, for example:
+#
+#   - id: session-bridge
+#     name: 'dsh-session-bridge'
+#     config:
+#       scratchRoot: /tmp
+#       scratchPrefix: dsh-session-
+#
+- insert:
+    - id: session-bridge
+      name: 'dsh-session-bridge'

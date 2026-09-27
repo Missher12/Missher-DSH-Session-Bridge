@@ -1,0 +1,11 @@
+# Local dependencies, build scratch, packages, and runtime evidence
+node_modules/
+.client-build/
+dist/
+verification/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.tgz
+*.log

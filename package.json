@@ -1,0 +1,77 @@
+{
+  "name": "dsh-session-bridge",
+  "version": "0.1.2",
+  "private": true,
+  "description": "DSH session plugin: run a session inside a throwaway /tmp scratch workspace, and talk to other sessions by their session id (list / read / send).",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "session",
+    "scratch",
+    "cross-session",
+    "cordis"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md",
+    "REPAIR_REPORT.md",
+    "PLUGIN_BOUNDARIES.md",
+    "SESSION_ACTIONS.md"
+  ],
+  "scripts": {
+    "build": "pnpm run build:host && pnpm run build:client",
+    "build:host": "tsc -p tsconfig.build.json",
+    "build:client": "pnpm run typecheck:client && node scripts/build-client.mjs && node scripts/check-client-load.mjs",
+    "typecheck": "tsc -p tsconfig.json && pnpm run typecheck:client",
+    "watch:client": "node scripts/build-client.mjs --watch",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "test:styles": "node scripts/check-style-ownership.mjs",
+    "check": "pnpm run typecheck && pnpm run build && pnpm test",
+    "typecheck:client": "tsc -p tsconfig.client.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-api-session-controller"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.7-rc.2",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.31",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@11.1.3"
+}
