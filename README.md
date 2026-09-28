@@ -1,3 +1,5 @@
+> **源码已迁移 / Source moved:** [dsh-session-bridge](https://github.com/Missher12/Deepseek-harness-Cordis/tree/main/plugins/dsh-session-bridge)。后续开发在统一仓库维护。本仓库保留旧提交与下载记录，并只读归档。
+
 # dsh-session-bridge
 
 DSH 会话功能插件。两件事：
