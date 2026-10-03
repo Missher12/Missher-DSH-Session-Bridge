@@ -1,5 +1,37 @@
 # dsh-session-bridge
 
+[← 桌面端与安装包](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [全部插件](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.zh.md) · [通用安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)
+
+## 新手上手：会话桥接
+
+查找和复制会话 ID，让 Agent 在指定会话之间投递任务，并创建临时工作目录。
+
+| 你需要知道的事 | 说明 |
+| --- | --- |
+| 插件包名 | `@missher/dsh-session-bridge` |
+| 当前源码版本 | `0.1.3-local.5` |
+| 装好后在哪里使用 | 会话标题栏；新会话的工作区选择器 |
+| 下载 / 源码 | [下载 0.1.3-local.5 安装包](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.5) |
+
+### 安装、启用与第一次使用
+
+1. 先从[桌面端主页](https://github.com/Missher12/Missher-DeepseekHarness-Desktop)下载适合电脑的应用，完成模型配置。这个仓库是可选插件，不是独立桌面应用。
+2. 阅读[通用安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)及本页原有安装说明，核对宿主与插件版本。桌面版使用“插件 → 添加插件”；Web/CLI 使用自己的目标配置组，不混用两种安装位置。
+3. 安装后按宿主提示启用并重新加载，进入上表列出的入口。更新已有插件前保留配置和数据，不同时启用旧包名与新包名。
+4. 复制一个会话 ID，确认目标会话后再使用跨会话投递；先用无敏感内容的小任务检查接收结果。
+
+### 使用前了解这些边界
+
+跨会话投递会在目标会话中产生真实消息；临时工作区也会产生文件。它不是聊天备份或自动同步服务。
+
+如果页面或功能没出现，先检查当前应用版本、插件是否启用以及加载错误。反馈时附版本、复现步骤和已脱敏错误；不要上传 API Key、真实会话、账号 Cookie 或学习数据库。Git 中的代码更新不会自动替换电脑上已安装的插件。
+
+### 继续阅读
+
+下文保留本插件的详细行为、配置、开发和验证说明。跨平台是否实际通过，以对应版本的验证记录为准；桌面安装包能启动，不代表全部插件和外部服务都已验收。
+
+---
+
 自家插件不再限制 DSH 宿主版本号；运行时按实际接口能力工作。开发依赖版本用于复现构建，不是安装门槛。本轮验证基线为 0.2.0-rc.1 与 0.2.0-rc.2，其他版本尚未验证。
 
 DSH 当前包名：`@missher/dsh-session-bridge`。2026-09-29 统一命名；仓库与源码目录、配置键及数据目录保持原有值。旧包升级需替换旧依赖与 Bundle 引用，不应同时启用新旧包。
@@ -17,13 +49,13 @@ DSH 当前包名：`@missher/dsh-session-bridge`。2026-09-29 统一命名；仓
 
 ## 安装与开发
 
-本插件的当前源码位于统一仓库 `plugins/dsh-session-bridge/`。先构建根宿主，再按[开发指南](https://github.com/Missher12/Missher-DSH-Inter/blob/main/docs/cookbook/build-cordis-plugins.zh.md)安装本目录依赖、检查、构建和打包。pnpm 11 配置在 `pnpm-workspace.yaml`；本包使用自己的 `packageManager`，不改宿主的版本。
+本仓库是会话桥接的独立源码入口，旧统一仓库中的副本已经停止维护。先构建根宿主，再按[开发指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/build-cordis-plugins.zh.md)安装本目录依赖、检查、构建和打包。pnpm 11 配置在 `pnpm-workspace.yaml`；本包使用自己的 `packageManager`，不改宿主的版本。
 
-Desktop 通过“插件 → 添加插件”安装已构建目录或 `.tgz`；CLI/Web 的独立 profile 按[安装指南](https://github.com/Missher12/Missher-DSH-Inter/blob/main/docs/cookbook/install-cordis-plugins.zh.md)操作。Bundle 自带的 [`cordis.patch.yml`](cordis.patch.yml)负责挂载，不需要手写 Bundle 清单。同一 profile 保持一个正式实例，不与旧 `session-bridge-dev` 别名同时启用，否则会重复注册工具。
+Desktop 通过“插件 → 添加插件”安装已构建目录或 `.tgz`；CLI/Web 的独立 profile 按[安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)操作。Bundle 自带的 [`cordis.patch.yml`](cordis.patch.yml)负责挂载，不需要手写 Bundle 清单。同一 profile 保持一个正式实例，不与旧 `session-bridge-dev` 别名同时启用，否则会重复注册工具。
 
 宿主模块热更新和客户端 bundle 热更新是两条链路；桌面 `hmr.root: []` 禁止宿主代码监听。新增客户端声明或调整依赖后，需要核对目标宿主的缓存行为；重新启动目标进程可避免沿用旧导出或元数据。源码中的宿主补丁不自动进入另一份已安装的 app.asar，也不包含在本插件包里。
 
-各次现场修复与部署状态保留在 [HANDOVER.md](HANDOVER.md)、[REPAIR_REPORT.md](REPAIR_REPORT.md)和[边界记录](PLUGIN_BOUNDARIES.md)，其中旧路径和阶段状态属于历史证据；当前维护入口见[仓库说明](https://github.com/Missher12/Missher-DSH-Inter/blob/main/CORDIS.md)。
+各次现场修复与部署状态保留在 [HANDOVER.md](HANDOVER.md)、[REPAIR_REPORT.md](REPAIR_REPORT.md)和[边界记录](PLUGIN_BOUNDARIES.md)，其中旧路径和阶段状态属于历史证据；当前维护入口见[仓库说明](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/CORDIS.md)。
 
 ## 配置
 
