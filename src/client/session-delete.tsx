@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Button, MenuItemButton, Modal, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SESSION_DELETE_PATH } from '../session-delete-wire.js'
 import { en } from './locales.js'
@@ -75,8 +75,22 @@ export function SessionDeleteMenuItem({ sessionId, archive, deleteActions, useMe
   useMenuOpenState: () => readonly [boolean, (open: boolean) => void]; t?: Translate
 }) {
   const [, setMenuOpen] = useMenuOpenState()
-  const snapshot = useSyncExternalStore(archive.subscribe, archive.getSnapshot)
-  if (!snapshot.archivedSessionIds.includes(sessionId)) return null
+  // Host stores use receiver-bound methods; React invokes bare callbacks.
+  const subscribe = useCallback((listener: () => void) => archive.subscribe(listener), [archive])
+  const getSnapshot = useCallback(() => archive.getSnapshot(), [archive])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot)
+  const archived = snapshot.archivedSessionIds.includes(sessionId)
+  const [supported, setSupported] = useState(false)
+  useEffect(() => {
+    if (!archived) return
+    const abort = new AbortController()
+    void fetch(SESSION_DELETE_PATH.slice(1), { credentials: 'same-origin', cache: 'no-store', signal: abort.signal })
+      .then(async response => response.ok ? await response.json() as { supported?: boolean } : null)
+      .then(result => { if (!abort.signal.aborted) setSupported(result?.supported === true) })
+      .catch(() => { if (!abort.signal.aborted) setSupported(false) })
+    return () => { abort.abort() }
+  }, [archived])
+  if (!archived || !supported) return null
   return <MenuItemButton danger separatorBefore onSelect={() => {
     setMenuOpen(false)
     deleteActions.request(sessionId)

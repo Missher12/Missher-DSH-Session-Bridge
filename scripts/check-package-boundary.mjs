@@ -15,7 +15,7 @@ const read = name => execFileSync('tar', ['-xOzf', archive, `package/${name}`], 
 assert.ok(entries.every(name => name.startsWith('package/') && !name.split('/').includes('..')))
 assert.ok(entries.every(name => !/dsh-context-manager|(^|\/)node_modules\/|(^|\/)verification\/|\.tgz$|\.patch$/.test(name)))
 const manifest = JSON.parse(read('package.json'))
-assert.equal(manifest.name, 'dsh-session-bridge')
+assert.equal(manifest.name, '@missher/dsh-session-bridge')
 assert.deepEqual(manifest.dependencies ?? {}, {}, 'Bridge must not acquire runtime dependencies')
 assert.deepEqual(manifest.peerDependencies ?? {}, {})
 for (const name of Object.keys(manifest.scripts ?? {})) {
@@ -28,7 +28,7 @@ for (const entry of entries.filter(name => /^package\/(?:lib|src)\/.*\.(?:js|tsx
 const client = read('lib/client/index.js')
 const runtimeRequests = [...new Set([...client.matchAll(/(?:require|__require)\(["']([^"']+)["']\)/g)].map(match => match[1]))].sort()
 assert.deepEqual(runtimeRequests, ['@deepseek-ai/dsh-client-ui-primitives', 'react', 'react/jsx-runtime'])
-assert.match(client, /style\.dataset\.plugin = ["']dsh-session-bridge["']/)
+assert.match(client, /style\.dataset\.plugin = ["']@missher\/dsh-session-bridge["']/)
 assert.match(client, /style\.dataset\.pluginCss = STYLE_ID/)
 const result = {
   package: manifest.name, version: manifest.version, archive,

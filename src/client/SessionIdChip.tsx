@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
-import { copyPayload, shortenSessionId, writeClipboard } from './clipboard.js'
+import { copyPayload, writeClipboard } from './clipboard.js'
 import type { CopyOutcome, CopyPayload } from './clipboard.js'
 import { en } from './locales.js'
 import type { SessionBridgeKey } from './locales.js'
@@ -196,7 +196,7 @@ export function SessionIdChip({ sessionId, useSessions, t }: SessionIdChipProps)
         title={`${text(t, 'chip.copy')} · ${sessionId}`}
         onClick={() => { void copy(idPayload) }}
       >
-        <span className="dsh-sbc-chipId">{shortenSessionId(sessionId)}</span>
+        <span className="dsh-sbc-chipId">{sessionId}</span>
         <span className="dsh-sbc-chipIcon">{chipAck === 'copied' ? <CheckIcon /> : <CopyIcon />}</span>
       </button>
       <button

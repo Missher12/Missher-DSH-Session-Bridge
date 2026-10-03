@@ -56,7 +56,7 @@ const packagePath = 'dsh/node_modules/@deepseek-ai/dsh-client-modules'
 const manifest = JSON.parse(await readArchiveFile(`${packagePath}/package.json`))
 const modulesSource = await readArchiveFile(`${packagePath}/${manifest.exports['./client'].default.replace(/^\.\//, '')}`)
 const bridgeSource = await readFile(join(pluginRoot, 'lib/client/index.js'), 'utf8')
-const BRIDGE = 'dsh-session-bridge'
+const BRIDGE = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8')).name
 const PEER = 'dsh-style-owner-fixture'
 const STYLE = 'dsh-session-bridge-styles'
 const graph = (...ids) => ({

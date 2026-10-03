@@ -9,3 +9,5 @@ verification/
 !.env.example
 *.tgz
 *.log
+
+harness-sdk

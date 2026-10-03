@@ -11,6 +11,8 @@ import type { SessionCopyKind, SessionListReader } from './session-menu.js'
 
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
 import type { ArchiveSource } from './session-delete.js'
+import { trackScratchPlacement } from './scratch-placement.js'
+import type { WorkspacePlacementSource } from './scratch-placement.js'
 
 export { createSessionDeleteActions } from './session-delete.js'
 export { createSessionCopyActions } from './session-menu.js'
@@ -72,17 +74,17 @@ const STYLE_ID = 'dsh-session-bridge-styles'
  * `dsh-sbc-` to keep them out of the app's own namespace.
  */
 const STYLES = `
-.dsh-sbc-root { position: relative; display: inline-flex; align-items: stretch; gap: 0; }
+.dsh-sbc-root { position: relative; display: inline-flex; align-items: stretch; gap: 0; inline-size: max-content; flex-shrink: 0; }
 .dsh-sbc-chip, .dsh-sbc-caret {
   display: inline-flex; align-items: center; gap: 5px;
-  height: 22px; padding: 0 7px;
+  min-height: 22px; padding: 3px 7px;
   border: 1px solid var(--dsw-alias-border-l1);
   background: transparent; color: var(--dsw-alias-label-secondary);
-  font-size: 11px; line-height: 1; cursor: pointer;
+  font-size: 11px; line-height: 1.35; cursor: pointer;
   transition: color .12s ease, border-color .12s ease, background-color .12s ease;
 }
-.dsh-sbc-chip { border-radius: 6px 0 0 6px; border-right-width: 0; max-width: 132px; }
-.dsh-sbc-caret { border-radius: 0 6px 6px 0; padding: 0 4px; }
+.dsh-sbc-chip { border-radius: 6px 0 0 6px; border-right-width: 0; min-width: 0; }
+.dsh-sbc-caret { border-radius: 0 6px 6px 0; padding: 0 4px; flex-shrink: 0; }
 .dsh-sbc-chip:hover, .dsh-sbc-caret:hover {
   color: var(--dsw-alias-label-primary);
   border-color: var(--dsw-alias-border-l2);
@@ -93,9 +95,9 @@ const STYLES = `
 }
 .dsh-sbc-chipId {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  letter-spacing: -.02em; overflow-wrap: normal; white-space: nowrap; text-align: left;
 }
-.dsh-sbc-chipIcon { display: inline-flex; opacity: .55; }
+.dsh-sbc-chipIcon { display: inline-flex; opacity: .55; flex-shrink: 0; }
 .dsh-sbc-chip:hover .dsh-sbc-chipIcon { opacity: 1; }
 .dsh-sbc-chip[data-copy-state="copied"] { color: var(--dsw-alias-state-success-primary); border-color: var(--dsw-alias-state-success-primary); }
 .dsh-sbc-chip[data-copy-state="failed"] { color: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-primary); }
@@ -162,8 +164,12 @@ export interface ClientContextLike {
       readonly inject?: () => Injected
     }, component: unknown): () => void
   }
-  readonly uiWorkspace: { pickDirectory(): Promise<string | null> }
-  readonly workspaces: { readonly list: ArchiveSource; create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }> }
+  readonly uiWorkspace: {
+    pickDirectory(): Promise<string | null>
+    /** Optional on older Hosts; the picker remains usable without sidebar placement. */
+    registerTrailingWorkspace?(workspaceId: string): () => void
+  }
+  readonly workspaces: { readonly list: ArchiveSource & WorkspacePlacementSource; create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }> }
   readonly sessions: SessionListReader
   effect(disposer: () => unknown, label?: string): void
 }
@@ -204,7 +210,7 @@ function installStyles(): () => void {
   style.id = STYLE_ID
   // Effects run after factory materialization; declare ownership before a
   // later plugin can claim this sheet and delete it during its own unload.
-  style.dataset.plugin = 'dsh-session-bridge'
+  style.dataset.plugin = '@missher/dsh-session-bridge'
   style.dataset.pluginCss = STYLE_ID
   style.textContent = STYLES
   document.head.appendChild(style)
@@ -217,6 +223,11 @@ function installStyles(): () => void {
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContextLike): void {
+  const picker = scratchPickerInjected(ctx)
+  const registerTrailing = ctx.uiWorkspace.registerTrailingWorkspace?.bind(ctx.uiWorkspace)
+  if (registerTrailing !== undefined) {
+    ctx.effect(() => trackScratchPlacement(ctx.workspaces.list, picker.findScratchWorkspace, registerTrailing), 'session-bridge: trailing workspace placement')
+  }
   const copyActions = createSessionCopyActions(ctx.sessions)
   const deleteActions = createSessionDeleteActions(ctx.workspaces.list)
   ctx.effect(() => () => { deleteActions.dispose() }, 'session-bridge: deletion confirmation')
@@ -237,7 +248,7 @@ export function apply(ctx: ClientContextLike): void {
     id: HERO_PICKER_ID,
     priority: HERO_PICKER_PRIORITY,
     locale: NS,
-    inject: () => scratchPickerInjected(ctx),
+    inject: () => picker,
   }, ScratchWorkspacePicker))
   const menu = 'sidebar.workspaces.session.menu.item'
   for (const [index, kind] of (['id', 'cwd', 'bridge'] as const).entries()) {

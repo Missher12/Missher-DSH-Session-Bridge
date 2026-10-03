@@ -1,3 +1,7 @@
+# 当前维护入口
+
+2026-10-03：此独立仓库是本插件唯一后续源码入口，包含 Git 安装所需 lib。旧统一仓库副本停止维护。常规验证、职责与私有边界继续遵循下方规则；历史路径和发布等待状态不覆盖本次迁移。
+
 # Session Bridge 项目约束
 
 - 本目录独立维护会话标识、跨会话通信、scratch 和插件 HTTP 接口。先读 README.md 与 PLUGIN_BOUNDARIES.md；原始问题及验证限制在 HANDOVER.md、REPAIR_REPORT.md。

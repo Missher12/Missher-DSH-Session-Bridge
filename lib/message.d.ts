@@ -11,7 +11,7 @@
  */
 /** The `source.kind` every bridged message carries. */
 export declare const BRIDGE_SOURCE_KIND = "session-bridge";
-/** One bridged message's durable provenance. */
+/** One bridged message's durable sender and source identity. */
 export interface BridgeMessageSource {
     readonly kind: typeof BRIDGE_SOURCE_KIND;
     /** Exact sending Session id, so the receiver can reply to it. */
@@ -48,7 +48,7 @@ export declare function createBridgeMessage(text: string, senderSessionId: strin
  * Frame a sender's body so the receiving model can tell it apart from the
  * human at its own keyboard, and can address a reply back.
  *
- * The frame is deliberately blunt about provenance: the receiving model must
+ * The frame states the sender and source explicitly: the receiving model must
  * treat the body as a peer request, never as authority it does not have.
  *
  * @param body - the exact text the sender asked to deliver.

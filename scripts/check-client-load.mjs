@@ -91,7 +91,8 @@ if (loaded === undefined) {
 }
 
 const problems = []
-if (loaded.id !== 'dsh-session-bridge') problems.push(`registered id is "${loaded.id}", expected "dsh-session-bridge"`)
+const expectedId = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).name
+if (loaded.id !== expectedId) problems.push(`registered id is "${loaded.id}", expected "${expectedId}"`)
 if (typeof loaded.exports.apply !== 'function') problems.push('exports.apply is not a function')
 if (!Array.isArray(loaded.exports.inject)) problems.push('exports.inject is not an array')
 for (const required of ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions']) {

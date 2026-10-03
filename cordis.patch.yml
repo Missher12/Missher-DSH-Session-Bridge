@@ -5,11 +5,11 @@
 # id, for example:
 #
 #   - id: session-bridge
-#     name: 'dsh-session-bridge'
+#     name: '@missher/dsh-session-bridge'
 #     config:
 #       scratchRoot: /tmp
 #       scratchPrefix: dsh-session-
 #
 - insert:
     - id: session-bridge
-      name: 'dsh-session-bridge'
+      name: '@missher/dsh-session-bridge'

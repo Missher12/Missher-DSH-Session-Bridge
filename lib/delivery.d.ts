@@ -39,7 +39,7 @@ export interface DeliveryPolicy {
  * Deliver one text body from the sending Agent into another Session.
  *
  * @param ctx - Host context.
- * @param sender - the exact live Agent sending, used for provenance and to refuse self-delivery.
+ * @param sender - the exact live Agent sending, used to record sender identity and to refuse self-delivery.
  * @param reference - the receiving Session's id, exact title, or unique id prefix.
  * @param body - the exact text to deliver.
  * @param mode - `steer` interleaves at the nearest step boundary and wakes an

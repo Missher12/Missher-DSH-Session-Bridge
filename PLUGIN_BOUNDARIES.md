@@ -1,6 +1,12 @@
 # 插件维护与交付边界
 
-2026-09-28 状态更新：用户报告实际安装包启用失败后，本任务已按授权修正生产 profile 中仅属于 Bridge 的两处旧临时配置，清除重复开发实例。此操作取代下文 2026-09-27 当时“不改 profile”的执行范围；未重启桌面、未改其他插件。当前正式 0.1.2 tgz 组件为 active，后续升级应安装新包，不再依赖工程 lib 监听。详见 HANDOVER.md 与现场验收记录。
+2026-09-28 第二轮逻辑归类（当前）：接受 [RECLASSIFICATION.md](/Users/missher/Documents/Deepseek-harness-Cordis/RECLASSIFICATION.md) 的 RC-02/03 分界。宿主 `packages/client/modules/` 的 5 项通用缓存路径转由「【DSH】宿主兼容与集成」承接后续维护及宿主候选集成；其余 28 项会话生命周期、归档/删除、持久化和工作区补丁仍归会话产品域。历史补丁和现有脏文件原样保留，不执行代码迁移或重复 apply。
+
+重复 `session_list` 注册的现场修复归插件部署配置：旧开发别名与正式包同时启用形成两个实例，不另记作新宿主缺陷，也不与通用缓存补丁混同。Bridge 自己的样式 owner/disposer 继续归 Bridge。共享的 `packages/api/session-controller/src/commands.ts` 由会话域保管现有改动；模型、输入和集成方只能只读提接口需求，未来跨域修改须先明确该次唯一写入者，再串行集成。本轮只增加本说明和[移交回执](/Users/missher/Documents/Deepseek-harness-Cordis/coordination/2026-09-28/reclassification/bridge-handoff.md)，不构建、不安装、不重启、不重复回归、不执行 Git 写操作；以下保留第一轮及更早记录。
+
+2026-09-28 协调审查边界：本轮只做职责核验、隔离局部回归和文档纠偏，不修改生产 profile、不重启应用、不构建日常源码 lib、不覆盖已交付包，也不执行 Git 暂存、提交或发布。REQ-01/04 的图片与 `@插件` 输入功能不归 Bridge；本轮四项新功能均未实现。当前检查见[独占回执](/Users/missher/Documents/Deepseek-harness-Cordis/coordination/2026-09-28/session-bridge.md)。
+
+历史现场修复（同日较早）：曾按当时授权移除生产 profile 中 Bridge 的开发别名及源码监听，解决正式包与开发实例重复注册；当时通过认证接口确认正式 0.1.2 为 active。该次授权不延续到本轮。本轮只读确认仍安装该 tgz，旧覆写未返回；当前进程已变化，认证组件状态未复验，不能沿用先前的 active 结论。后续更新应安装新包，不再依赖工程 lib 监听。
 
 2026-09-27 已与上下文管理任务确认以下分工。本文件只约束 Session Bridge；不授权修改另一插件。
 
@@ -9,7 +15,7 @@
 | Session Bridge 任务 | `/Users/missher/Documents/Projects/04-Harness-Plugins/dsh-session-bridge` | 会话标识、跨会话通信、scratch、固定工作区与确认删除 HTTP 接口、Bridge 样式、构建、测试与独立交付 |
 | 上下文管理任务 | `/Users/missher/Documents/Deepseek-harness-Cordis/dsh-context-manager` | 请求前压缩、阈值设置、只读上下文概览及其独立交付 |
 
-Bridge 的 DSH 宿主修改继续作为独立的 `upstream.patch` 交付，位于 `/Users/missher/Documents/Deepseek-harness-Cordis/session-bridge-repair-20260927/`，不打进任一插件包。此前修复已完成；用户随后明确要求归档会话删除和标题栏归档入口，因此新增必要的宿主接口及按钮补丁，独立存放在 `/Users/missher/Documents/Deepseek-harness-Cordis/session-actions-20260927/`。不改运行中 profile，也不重启生产应用。
+Bridge 的 DSH 宿主修改继续作为独立的 `upstream.patch` 交付，位于 `/Users/missher/Documents/Deepseek-harness-Cordis/session-bridge-repair-20260927/`，不打进任一插件包。用户随后明确要求归档会话删除和标题栏归档入口，相应宿主接口及按钮补丁独立存放在 `/Users/missher/Documents/Deepseek-harness-Cordis/session-actions-20260927/`。这两组补丁属于已实现、未部署的宿主源码工作，不能因插件 0.1.2 已安装而说成日常应用已支持。本轮将宿主全部 33 个变更路径与历史补丁逐项核对一致，只读保留；没有接管其他会话源码。
 
 双方不得修改或打包对方源码、lib、配置或安装包。只读证据核验允许；对方任务提供的结果是协作证据，不成为本插件的运行时依赖。上下文任务此前对 Bridge 的两个 style 标记及 HANDOVER 补充正式由 Bridge 接管，后续构建、回归及发布由 Bridge 维护。
 

@@ -30,7 +30,10 @@ declare const sessions: ISessions;
 declare const uiWorkspace: UiWorkspace;
 declare const registry: WorkspaceRegistry;
 declare const controller: SessionController;
-const deletion: Pick<SessionControllerLike, 'deleteArchivedSession'> = controller;
+type HostDeletion = SessionController extends { deleteArchivedSession: infer Method }
+  ? { deleteArchivedSession: Method } : { deleteArchivedSession?: never };
+declare const optionalDeletion: HostDeletion;
+const deletion: Pick<SessionControllerLike, 'deleteArchivedSession'> = optionalDeletion;
 const hostFetch: ScratchConnection = hostConnection;
 const clientStore: ClientContextLike['workspaces'] = workspaces;
 const sessionSummaries: ClientContextLike['sessions'] = sessions;

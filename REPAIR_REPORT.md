@@ -1,5 +1,7 @@
 # Session Bridge 修复与分诊记录（2026-09-27）
 
+历史记录说明（2026-09-28）：本文保留最初分诊时的版本、无 Git 元数据、两处 profile 覆写与验收结果，不作为当前状态。后续已建立独立 Git 仓库、交付 0.1.2，并在一次已完成的现场修复中移除开发别名及源码监听；下文旧清理命令和“尚未撤销”描述不应再次执行或沿用。本轮按协调约束只做隔离回归与文档纠偏，当前源码、33 项宿主变更归属和部署限制见[独占回执](/Users/missher/Documents/Deepseek-harness-Cordis/coordination/2026-09-28/session-bridge.md)。
+
 已通读插件原始 HANDOVER.md，并重读涉及的宿主实现。插件源码与构建产物已修改；上游只修改 client-modules 的元数据失效逻辑。**未重新打包或替换正在运行的应用；真实 Electron 点击验收未完成。**
 
 证据目录：`/Users/missher/Documents/Deepseek-harness-Cordis/session-bridge-repair-20260927/`。下文补丁、备份和 JSON 文件均位于此目录。

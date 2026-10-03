@@ -41,7 +41,11 @@ try {
   let finish
   const registrations = new Map()
   const snapshot = { archivedSessionIds: ['archived'] }
-  const archive = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const archive = {
+    snapshot,
+    getSnapshot() { return this.snapshot },
+    subscribe() { assert.equal(this, archive, 'subscribe keeps the Host store receiver'); return () => {} },
+  }
   const sandbox = {
     window: { __ModuleLoader__: { load({ factory }) {
       plugin = factory(id => {
@@ -52,8 +56,9 @@ try {
       })
     } } }, document, navigator, console, setTimeout, clearTimeout, AbortController,
     fetch: async (path, options) => {
-      sends++
       assert.equal(path, 'api/session-bridge/delete-session')
+      if (options.method !== 'POST') return Response.json({ supported: true })
+      sends++
       assert.deepEqual(JSON.parse(options.body), { sessionId: 'archived', confirmed: true })
       return await new Promise(resolve => { finish = resolve })
     },
@@ -132,12 +137,14 @@ try {
     await act(async () => root.render(React.createElement(plugin.ScratchWorkspacePicker, props)))
   }
   await picker('existing', [{ workspaceId: 'scratch-existing', title: '不在工作区' }], 'scratch-existing', 'scratch-existing')
-  assert.deepEqual(rowLabels(), ['不在工作区', 'Add workspace…'], 'one existing workspace, no duplicate shortcut')
+  assert.deepEqual(rowLabels(), ['Add workspace…', '不在工作区'], 'existing identity is the last choice, without a duplicate')
+  assert.equal(button('Add workspace…').closest('[role=presentation]'), button('不在工作区').closest('[role=presentation]'), 'scratch scrolls in the same menu list')
+  assert.equal(button('不在工作区').closest('[role=menu]').querySelectorAll('[role=presentation]').length, 1, 'there is no separate footer')
   assert.equal(creations, 0, 'opening the picker is read-only')
   await act(async () => button('不在工作区').click())
   assert.equal(picks.at(-1), 'scratch-existing', 'selection uses the existing identity')
   await picker('renamed', [{ workspaceId: 'scratch-existing', title: '我的临时目录' }], 'scratch-existing')
-  assert.deepEqual(rowLabels(), ['我的临时目录', 'Add workspace…'], 'a renamed scratch workspace still suppresses the duplicate')
+  assert.deepEqual(rowLabels(), ['Add workspace…', '我的临时目录'], 'renaming preserves the fixed last choice')
   await picker('same-title', [{ workspaceId: 'ordinary', title: '不在工作区' }], null)
   assert.deepEqual(rowLabels(), ['不在工作区', 'Add workspace…', scratchLabel], 'a same-named unrelated workspace must not hide scratch creation')
   await picker('first-use', [], null)
@@ -153,7 +160,16 @@ try {
   assert.equal(picks.at(-1), 'ordinary', 'a failed optional lookup leaves ordinary workspace selection usable')
   assert.equal(pickerLookups, 5, 'rendering lookup results must not loop or create additional requests')
   anchor.remove()
+  const fullSessionId = 'session-12345678-1234-5678-90ab-1234567890ab'
+  await act(async () => root.render(React.createElement(plugin.SessionIdChip, {
+    sessionId: fullSessionId,
+    useSessions: select => select({ byId: { [fullSessionId]: { cwd: '/synthetic/workspace' } } }),
+  })))
+  assert.equal(document.querySelector('.dsh-sbc-chipId').textContent, fullSessionId, 'visible ID includes every character and the prefix')
+  await act(async () => document.querySelector('.dsh-sbc-chip').click())
+  assert.equal(copied.at(-1), fullSessionId, 'copy matches the full visible identity')
   const result = { status: 'passed', realReactAndPrimitives: true, builtPlugin: true, copiedSelectedRow: true,
+    fullSessionIdVisible: true, fullSessionIdCopied: true, archiveReceiverPreserved: true,
     confirmationBeforeSend: true, cancelDoesNotDelete: true, pendingBlocksRepeat: true, feedbackAfterMenuClose: true,
     scratchPickerSingleEntry: true, scratchIdentitySurvivesRename: true, sameTitleProjectPreserved: true,
     pickerOpenDoesNotCreate: true, firstScratchClickCreatesOnce: true, lookupFailureKeepsOrdinarySelection: true,

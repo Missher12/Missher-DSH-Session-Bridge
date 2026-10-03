@@ -1,4 +1,11 @@
+# Build this Bundle independently against the explicit harness-sdk development link.
+# Runtime dependency declarations remain in package.json.
+packages:
+  - .
 allowBuilds:
   esbuild: true
 autoInstallPeers: false
 strictPeerDependencies: false
+overrides:
+  '@deepseek-ai/cordis': 'link:./harness-sdk/vendor/cordis'
+  '@deepseek-ai/dsh-client-ui-primitives': 'link:./harness-sdk/packages/client/ui-primitives'

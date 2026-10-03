@@ -212,16 +212,16 @@ export function ScratchWorkspacePicker({
     onPick(id)
   }
 
-  const workspaceItems: MenuEntry[] = workspaces.map(workspace => ({
+  const scratch = workspaces.find(workspace => workspace.workspaceId === scratchWorkspaceId)
+  const workspaceItems: MenuEntry[] = workspaces.filter(workspace => workspace.workspaceId !== scratchWorkspaceId).map(workspace => ({
     id: workspace.workspaceId,
     label: workspace.title,
     icon: <IconFolderCloseRegular size={16} />,
     disabled: busy,
   }))
 
-  // Only offer the scratch creation shortcut while its registered workspace
-  // is absent from the normal list. That row keeps its selection and title.
-  const scratchListed = workspaces.some(workspace => workspace.workspaceId === scratchWorkspaceId)
+  // The fixed-directory identity is last in the same scrolling list. Reuse
+  // its real id and saved title; a same-named project stays in the main list.
   const addEntries: MenuEntry[] = [
     {
       id: ADD_WORKSPACE,
@@ -229,26 +229,23 @@ export function ScratchWorkspacePicker({
       icon: <IconPlusOutlineRegular size={16} />,
       disabled: busy,
     },
-    ...!lookingUpScratch && !scratchListed ? [{
-      id: SCRATCH,
-      label: busy ? text(t, 'picker.starting') : text(t, 'picker.scratch'),
+  ]
+  const scratchEntries: MenuEntry[] = !lookingUpScratch ? [{
+      id: scratch?.workspaceId ?? SCRATCH,
+      label: scratch?.title ?? (busy ? text(t, 'picker.starting') : text(t, 'picker.scratch')),
       icon: <IconSparkleRegular size={16} />,
       disabled: busy,
-    }] : [],
-  ]
-  const pinAdd = workspaces.length > 0
-  const items: MenuEntry[] = pinAdd ? workspaceItems : addEntries
-  const menuIsEmpty = items.length === 0
+    }] : []
+  const items: MenuEntry[] = [...workspaceItems, ...addEntries, ...scratchEntries]
 
   const closeModal = (): void => { setError(null) }
 
   return (
     <>
       <Menu
-        open={open && !menuIsEmpty}
+        open={open}
         anchor={null}
         items={items}
-        {...pinAdd ? { footer: addEntries } : {}}
         selectedId={selectedId}
         onSelect={handleSelect}
         onClose={onClose}
@@ -256,7 +253,7 @@ export function ScratchWorkspacePicker({
         portal
         getAnchorRect={getAnchorRect}
       />
-      {open && !menuIsEmpty && (snapshot.phase === 'pending' || lookingUpScratch) && (
+      {open && (snapshot.phase === 'pending' || lookingUpScratch) && (
         <div className="dsh-sbp-status" role="status">{text(t, 'picker.loading')}</div>
       )}
       <Modal
@@ -270,7 +267,7 @@ export function ScratchWorkspacePicker({
       </Modal>
       {/* The scratch row's own explanation, surfaced while it is the only entry
           (no Workspaces yet) so the choice is legible before it is made. */}
-      {open && !pinAdd && (
+      {open && workspaces.length === 0 && (
         <div className="dsh-sbp-hint" role="note">
           {text(t, 'picker.scratchHint')}
         </div>

@@ -1,6 +1,10 @@
 # dsh-session-bridge
 
-DSH 会话功能插件。两件事：
+自家插件不再限制 DSH 宿主版本号；运行时按实际接口能力工作。开发依赖版本用于复现构建，不是安装门槛。本轮验证基线为 0.2.0-rc.1 与 0.2.0-rc.2，其他版本尚未验证。
+
+DSH 当前包名：`@missher/dsh-session-bridge`。2026-09-29 统一命名；仓库与源码目录、配置键及数据目录保持原有值。旧包升级需替换旧依赖与 Bundle 引用，不应同时启用新旧包。
+
+当前版本 **0.1.3-local.5**，适配 **DSH 0.2.0-rc.1 / 0.2.0-rc.2**。DSH 会话功能插件。两件事：
 
 1. **临时目录会话** —— 会话不必待在默认工作区。`session_scratch` 会在 `/tmp` 下开一个一次性目录（`/tmp/dsh-session-XXXXXX`），要么把新会话的 `cwd` 就放在那里（并注册成独立工作区，侧边栏里像一个普通项目），要么把目录路径交回给当前会话使用。
 2. **按会话 ID 跨会话沟通** —— `session_list` / `session_read` / `session_send` 让一个会话找到、读取、并给另一个会话发消息。发出去的消息在对方会话里是一条真实的 user-role 回合，来源标注为发送方，所以两边能来回对话。对方是冷会话时会先按 DSH 自己的 resume 路径唤醒。
@@ -11,27 +15,15 @@ DSH 会话功能插件。两件事：
 
 开发依赖包含 TypeScript、Node/React 类型、esbuild，以及用于类型检查的 primitives 和 Cordis。它们不会打入客户端 bundle，也不会在宿主入口导入。结构声明仍有版本漂移风险，可用 `node scripts/check-host-contracts.mjs '/path/to/DSH checkout'` 对照已构建 checkout 的正式声明。
 
-## 安装
+## 安装与开发
 
-```sh
-cd /Users/missher/Documents/Projects/04-Harness-Plugins/dsh-session-bridge
-pnpm install
-pnpm build          # 宿主编译 + 客户端严格类型检查、打包和加载自检
-```
+本插件的当前源码位于统一仓库 `plugins/dsh-session-bridge/`。先构建根宿主，再按[开发指南](https://github.com/Missher12/Missher-DSH-Inter/blob/main/docs/cookbook/build-cordis-plugins.zh.md)安装本目录依赖、检查、构建和打包。pnpm 11 配置在 `pnpm-workspace.yaml`；本包使用自己的 `packageManager`，不改宿主的版本。
 
-然后在 profile 里注册（桌面端 profile 已经装好）：
+Desktop 通过“插件 → 添加插件”安装已构建目录或 `.tgz`；CLI/Web 的独立 profile 按[安装指南](https://github.com/Missher12/Missher-DSH-Inter/blob/main/docs/cookbook/install-cordis-plugins.zh.md)操作。Bundle 自带的 [`cordis.patch.yml`](cordis.patch.yml)负责挂载，不需要手写 Bundle 清单。同一 profile 保持一个正式实例，不与旧 `session-bridge-dev` 别名同时启用，否则会重复注册工具。
 
-```sh
-dsh plugin add link:/Users/missher/Documents/Projects/04-Harness-Plugins/dsh-session-bridge
-```
+宿主模块热更新和客户端 bundle 热更新是两条链路；桌面 `hmr.root: []` 禁止宿主代码监听。新增客户端声明或调整依赖后，需要核对目标宿主的缓存行为；重新启动目标进程可避免沿用旧导出或元数据。源码中的宿主补丁不自动进入另一份已安装的 app.asar，也不包含在本插件包里。
 
-或者手写 `~/.dsh/profiles/<name>/package.json` 的 `dsh.profile.bundles` 加一项 `dsh-session-bridge`。插件自带的 [`cordis.patch.yml`](cordis.patch.yml) 负责挂载行。
-
-宿主模块热更新和客户端 bundle 热更新是两条链路。桌面 `hmr.root: []` 禁止宿主代码监听；开发时可显式监听本插件 `lib/`，或在构建后重启应用。已经进入 boot graph 的客户端 bundle 由 `client-hmr` 独立监听。
-
-DSH 0.1.7-rc.2 原版还会跨 Loader 行重载保留 `dsh.client` 正面/负面元数据缓存。新增客户端声明、调整依赖后，重启进程才可靠；本次提供的上游补丁在 Loader 行事件时失效对应缓存，不会自动监听 package.json。补丁只改源码不会影响正在运行的 app.asar。安装正式 tgz 前必须撤销旧的 `session-bridge-dev` 改名配置，正常的 Bundle 依赖和原始行应保留；两行一起启用会重复注册工具。现场已通过 HMR 分两步完成清理（先禁用正式行并移除开发行，待旧实例释放后启用正式行），无需重启；配置备份和实测记录见 HANDOVER.md。具体命令和本次证据见 [REPAIR_REPORT.md](REPAIR_REPORT.md)。
-
-pnpm 11 的设置在 `pnpm-workspace.yaml`，使用 `allowBuilds.esbuild: true`；不再编辑 `node_modules/.modules.yaml`。本项目锁定 pnpm 11.1.3，宿主 checkout 自己的 11.7.0 不变。
+各次现场修复与部署状态保留在 [HANDOVER.md](HANDOVER.md)、[REPAIR_REPORT.md](REPAIR_REPORT.md)和[边界记录](PLUGIN_BOUNDARIES.md)，其中旧路径和阶段状态属于历史证据；当前维护入口见[仓库说明](https://github.com/Missher12/Missher-DSH-Inter/blob/main/CORDIS.md)。
 
 ## 配置
 
@@ -39,7 +31,7 @@ pnpm 11 的设置在 `pnpm-workspace.yaml`，使用 `allowBuilds.esbuild: true`�
 
 ```yaml
 - id: session-bridge
-  name: 'dsh-session-bridge'
+  name: '@missher/dsh-session-bridge'
   config:
     scratchRoot: /tmp
     scratchPrefix: dsh-session-
@@ -64,7 +56,9 @@ pnpm 11 的设置在 `pnpm-workspace.yaml`，使用 `allowBuilds.esbuild: true`�
 
 **只有一个，而且有名字。** 侧边栏里出现的项目固定叫 **「不在工作区」**，反复用也不会多出第二个。早先的版本每次点击都新开一个 `dsh-session-XXXXXX` 目录，于是每点一次侧边栏就多一个随机名的项目——那正是这个功能本来要避免的乱象。
 
-选择器也只保留一个入口：工作区已经注册时，直接使用列表中的现有项目，底部不再重复显示「不在工作区（临时目录）…」。打开菜单只查询配置目录对应的工作区 ID，不创建目录或会话；用户重命名、自定义临时根目录和同名的其他项目都按真实身份区分。
+选择器只保留一个入口，排在同一滚动列表的最后，不设独立 footer。注册后沿用真实 ID 和用户保存的标题；尚未注册时显示创建入口。打开菜单只查询配置目录对应的工作区 ID，不创建目录或会话。同名的其他项目保留原位。
+
+支持 `uiWorkspace.registerTrailingWorkspace` 的宿主还会把这一个工作区组排在侧栏同一列表的其他分组之后，与其他组一起滚动。单列表和搜索沿用宿主的会话列表。该注册只改变显示顺序，不迁移会话、不修改标题或持久排序；停用插件即恢复普通顺序。旧宿主仍可使用菜单，需要 ui-workspace 宿主补丁才能调整侧栏顺序。
 
 **为什么它还是个工作区（而不是真的「不在工作区」）。** DSH 里 `blank` 只在 `turn/start` 时清除（`api/session-controller/src/list.ts`），而新会话在输入第一个字之前一定是 blank；`ConversationContent` 里 `inert = sessionId === undefined || (hero && chipTitle === undefined)`，而 `chipTitle` 在没有归属工作区时是 `undefined`（注释里第 5 种情况：列表已就绪但没有归属工作区 → 占位符）。合起来就是：**没有工作区的新会话输入框是禁用的**，建出来也打不了字。所以这一行必须注册一个工作区，能做的只是让它只有一个、并且叫得清楚。
 
@@ -90,7 +84,7 @@ DSH 原本会在会话头部把 `sessionId` 当成面包屑文本渲染出来（
 
 客户端半边补上了这一环，挂在 `conversation.session.header.actions`（会话标题旁那一条动作带，和「创造模式」标签、后台任务计数并排），order 取 `0`，落在 agent-preset(-10) 之后、job-list(20) 之前：
 
-- **收起时**：显示短 ID（`af569227…791a`），点一下即把**完整 ID** 写入剪贴板。这是 Codex 状态面板把 `("Session ID", thread_id)` 当作一等复制目标的做法。
+- **收起时**：直接显示完整会话 ID（包含 `session-` 前缀），点一下复制相同的完整 ID。保持完整单行显示，不换行、不省略中间字符。
 - **展开后**（caret）：三行各自带复制按钮——会话 ID、工作目录、以及 `在其他会话里引用` 给出的 `/bridge <session-id> ` 前缀（粘到另一个会话的输入框就能给它发消息）。
 - 复制失败会显示 `复制失败` 而不是静默什么都不做：优先用异步 Clipboard API（loopback 是安全上下文），失败则退回 `execCommand`。
 
@@ -182,3 +176,7 @@ scripts/check-client-load.mjs  构建产物求值自检
 ```
 
 MIT.
+
+## 独立源码开发
+
+运行包已包含 lib，使用时不需要开发环境。修改源码需 Node 和本仓库 packageManager 指定的 pnpm；先运行 `node scripts/link-harness.mjs /绝对路径/已构建的Missher-DSH-Inter`，再执行 `pnpm install --frozen-lockfile`，随后使用 package.json 中的 typecheck、build 和 test。SDK 链接只写本插件开发目录；harness-sdk 不提交、不进入安装包。

@@ -24,6 +24,8 @@ it('routes through the Host owner and reports unsupported Hosts without touching
     effect(start) { cleanups.push(start()) },
   }
   registerSessionDeleteRoute(ctx)
+  const capability = () => route.fetch(new Request('http://localhost' + route.path)).then(response => response.json())
+  assert.deepEqual(await capability(), { supported: false })
   const send = value => route.fetch(new Request('http://localhost' + route.path, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value),
   }))
@@ -33,6 +35,8 @@ it('routes through the Host owner and reports unsupported Hosts without touching
   assert.equal((await unsupported.json()).error.code, 'session/delete-unsupported')
   const deleted = []
   controller.deleteArchivedSession = async id => { deleted.push(id) }
+  assert.deepEqual(await capability(), { supported: true })
+  assert.deepEqual(deleted, [], 'capability lookup must never delete a session')
   assert.equal((await (await send({ sessionId: 'one', confirmed: true })).json()).ok, true)
   assert.deepEqual(deleted, ['one'])
   controller.deleteArchivedSession = async () => { throw new Error('session/delete-active') }

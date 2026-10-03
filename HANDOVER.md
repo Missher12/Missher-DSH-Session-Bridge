@@ -1,3 +1,5 @@
+2026-09-28 协调审查：本轮不改生产、不重启、不重建日常 lib、不覆盖包、不执行 Git 写入。插件基线为 0.1.2 / `c9ee52c3c7ac4ddb2cb3274d1089862a817c63b6`；宿主 33 项既有变更逐项匹配历史独立补丁。本轮隔离回归、当前安装状态和未验收层见[会话桥接回执](/Users/missher/Documents/Deepseek-harness-Cordis/coordination/2026-09-28/session-bridge.md)。下方现场修复中的进程、端口、active 状态均为当时证据；当前进程已变，本轮认证状态接口返回 401，未重新确认 active。旧版问题清单与命令保留作历史，不覆盖本轮边界。
+
 2026-09-28 现场启用故障已修复：安装 0.1.2 tgz 后，正式 `session-bridge` 与旧 `session-bridge-dev` 同时启用，造成 `session_list` 重复注册。已备份并从生产 profile 撤销改名行及源码 lib 监听，分两步排空旧实例后启用正式组件；当前真实宿主仅一行，`enabled=true`、`fiberPhase=active`，受鉴权的 scratch GET 正常。194 个其他组件状态、工作区存储与包清单/锁文件均不变，桌面未重启。当前是 tgz 安装，修改工程源码不会更新现用插件。证据见 `/Users/missher/Documents/Deepseek-harness-Cordis/bridge-duplicate-registration-20260927/`。
 
 2026-09-27 选择器修复（0.1.2）：生产数据只有一个 `/private/tmp/dsh-scratch` 工作区，含 3 个会话；重复来自新会话菜单的已有工作区行和底部快捷入口。插件通过受鉴权的只读 GET 查询固定目录对应 ID，在该工作区已列出时隐藏快捷入口；保留改名，不按标题判断。只改插件，未更改宿主或生产数据；验收证据在 `/Users/missher/Documents/Deepseek-harness-Cordis/scratch-picker-dedup-20260927/`。
