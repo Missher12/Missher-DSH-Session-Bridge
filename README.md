@@ -1,214 +1,140 @@
-# dsh-session-bridge
+# Session Bridge · 会话桥接
 
-[← 桌面端与安装包](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [全部插件](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.zh.md) · [通用安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)
+中文 | [English](README.en.md) · [桌面端与安装包](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [全部插件](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.zh.md)
 
-## 新手上手：会话桥接
+为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-查找和复制会话 ID，让 Agent 在指定会话之间投递任务，并创建临时工作目录。
+- 包名：`@missher/dsh-session-bridge`；版本：**0.1.3-local.6**。
+- 本版只整理发行包装、许可证和双语文档；`src/` 与 `lib/` 保持已验收 local.5 的字节。
+- 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
+- [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
-| 你需要知道的事 | 说明 |
+## 安装固定版本
+
+从 [v0.1.3-local.6 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.6) 下载 `missher-dsh-session-bridge-0.1.3-local.6.tgz` 和 `SHA256SUMS`。发行资产由维护者发布；若该 Release 尚未出现，这个版本仍是发行候选。不要将 GitHub 的自动源码压缩包当作插件 tarball。
+
+下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
+
+**Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
+
+```text
+https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.6/missher-dsh-session-bridge-0.1.3-local.6.tgz
+```
+
+**已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
+
+```sh
+dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.6/missher-dsh-session-bridge-0.1.3-local.6.tgz
+```
+
+也可把 URL 换成本地 tarball 的绝对路径。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
+
+## 使用
+
+### 会话 ID 与菜单
+
+会话标题栏完整显示包含 `session-` 前缀的 ID，保持一行、原字号、不省略；单击复制完整值。右侧展开按钮提供 ID、工作目录及 `/bridge <session-id> ` 引用的复制入口。侧栏会话的三点菜单也提供这三项，包括归档行；读取被点击会话，不切换当前会话。目录未加载或复制失败会给出提示。
+
+当会话栏窄于完整 ID 和固定按钮的总宽时，存在布局空间限制；本功能不通过缩写 ID 或缩小字号隐藏该限制。
+
+### 「不在工作区」与 scratch
+
+新会话选择器末尾提供“✨ 不在工作区（临时目录）…”。选择后复用配置根目录下的 **`dsh-scratch` 工作区**，默认标题为“不在工作区”；macOS 的默认规范路径是 `/private/tmp/dsh-scratch`。它仍是正式注册的工作区，不是真正无工作区的会话。宿主的 blank 会话输入流程需要工作区。
+
+只打开选择器不会创建目录或会话。重复选择复用规范路径及真实工作区 ID，保留用户重命名；不合并其他同名项目。固定路径若是符号链接、非当前用户所有，或可被组/其他用户写入，创建请求会失败。
+
+模型工具 `session_scratch` 和 `/scratch` 则为每次调用建立独立的一次性目录；这与界面复用 `dsh-scratch` 的行为不同。临时目录可能被操作系统清理，不适合作为重要文件的唯一保存位置。
+
+### 工具与命令
+
+| 模型工具 | 作用 |
 | --- | --- |
-| 插件包名 | `@missher/dsh-session-bridge` |
-| 当前源码版本 | `0.1.3-local.5` |
-| 装好后在哪里使用 | 会话标题栏；新会话的工作区选择器 |
-| 下载 / 源码 | [下载 0.1.3-local.5 安装包](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.5) |
+| `session_list` | 列出会话 ID、标题、目录和运行状态；默认排除子代理会话。 |
+| `session_read` | 读取目标最近的用户/助手文本，不含思维链和工具结果；只读，不唤醒目标。 |
+| `session_send` | 向目标投递真实 user-role 消息；`steer` 在步骤边界送达、空闲时开始回合，`turn` 排队为独立回合。 |
+| `session_scratch` | `session` 模式在独立临时目录创建会话；`directory` 模式不创建会话，但默认仍注册工作区，可用 `registerScratchWorkspace: false` 关闭。 |
 
-### 安装、启用与第一次使用
+目标接受精确 ID、忽略大小写的精确标题或唯一 ID 前缀；歧义会拒绝，不猜测。
 
-1. 先从[桌面端主页](https://github.com/Missher12/Missher-DeepseekHarness-Desktop)下载适合电脑的应用，完成模型配置。这个仓库是可选插件，不是独立桌面应用。
-2. 阅读[通用安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)及本页原有安装说明，核对宿主与插件版本。桌面版使用“插件 → 添加插件”；Web/CLI 使用自己的目标配置组，不混用两种安装位置。
-3. 安装后按宿主提示启用并重新加载，进入上表列出的入口。更新已有插件前保留配置和数据，不同时启用旧包名与新包名。
-4. 复制一个会话 ID，确认目标会话后再使用跨会话投递；先用无敏感内容的小任务检查接收结果。
+| 人类命令 | 作用 |
+| --- | --- |
+| `/sessions [过滤词]` | 列出会话 ID 与标题。 |
+| `/bridge <ID或标题> <消息>` | 给指定会话投递消息；含空格标题按可唯一解析的最长前缀识别。 |
+| `/scratch [标签]` | 新建临时目录会话。 |
+| `/scratch-clean` | 预览可清理的一次性临时项目。 |
+| `/scratch-clean yes` | 真正注销符合条件的项目并删除其目录。 |
 
-### 使用前了解这些边界
+清理按规范化 `scratchRoot` 范围、目录名以 `dsh-` 开头、没有非空白会话筛选已注册工作区，始终排除固定 `dsh-scratch`。它不检查插件创建标记，也不使用当前 `scratchPrefix`：其他符合条件的 `dsh-*` 工作区也可能入选，自定义非 `dsh-` 前缀则不会入选。目录内自行保存的文件也会删除；先看预览，保留所需文件。
 
-跨会话投递会在目标会话中产生真实消息；临时工作区也会产生文件。它不是聊天备份或自动同步服务。
+## Host 与平台边界
 
-如果页面或功能没出现，先检查当前应用版本、插件是否启用以及加载错误。反馈时附版本、复现步骤和已脱敏错误；不要上传 API Key、真实会话、账号 Cookie 或学习数据库。Git 中的代码更新不会自动替换电脑上已安装的插件。
+没有宿主版本号硬限制，不代表所有版本都兼容。开发 SDK 基线为 rc.2；功能取决于 Host 服务与插槽是否存在。
 
-### 继续阅读
+| 能力 | 官方 DSH 0.2.0-rc.2 | 带对应公共扩展的 Missher Desktop |
+| --- | --- | --- |
+| ID/复制、跨会话工具、scratch、选择器末尾入口 | 插件提供；历史隔离加载已验收 | 插件提供 |
+| 将“不在工作区”组排在侧栏其他工作区之后 | 无扩展时保留普通顺序 | 使用 `uiWorkspace.registerTrailingWorkspace`；不改持久排序 |
+| 永久删除归档聊天记录 | 无 `sessionController.deleteArchivedSession`，隐藏入口 | 归档行“删除会话…”二次确认；保留工作区文件 |
+| 工作区标题栏独立归档图标 | 官方归档筛选位于视图选项 | 属于 Host 增强，不由本插件包提供 |
 
-下文保留本插件的详细行为、配置、开发和验证说明。跨平台是否实际通过，以对应版本的验证记录为准；桌面安装包能启动，不代表全部插件和外部服务都已验收。
+永久删除的运行中、其他写入者占用和派生子会话保护由 Host 执行。插件只调用公共删除接口，不推断或修改 Host 私有日志。未安装对应 Host 扩展时，升级插件不能补出该能力。
 
----
-
-自家插件不再限制 DSH 宿主版本号；运行时按实际接口能力工作。开发依赖版本用于复现构建，不是安装门槛。本轮验证基线为 0.2.0-rc.1 与 0.2.0-rc.2，其他版本尚未验证。
-
-DSH 当前包名：`@missher/dsh-session-bridge`。2026-09-29 统一命名；仓库与源码目录、配置键及数据目录保持原有值。旧包升级需替换旧依赖与 Bundle 引用，不应同时启用新旧包。
-
-当前版本 **0.1.3-local.5**，适配 **DSH 0.2.0-rc.1 / 0.2.0-rc.2**。DSH 会话功能插件。两件事：
-
-1. **临时目录会话** —— 会话不必待在默认工作区。`session_scratch` 会在 `/tmp` 下开一个一次性目录（`/tmp/dsh-session-XXXXXX`），要么把新会话的 `cwd` 就放在那里（并注册成独立工作区，侧边栏里像一个普通项目），要么把目录路径交回给当前会话使用。
-2. **按会话 ID 跨会话沟通** —— `session_list` / `session_read` / `session_send` 让一个会话找到、读取、并给另一个会话发消息。发出去的消息在对方会话里是一条真实的 user-role 回合，来源标注为发送方，所以两边能来回对话。对方是冷会话时会先按 DSH 自己的 resume 路径唤醒。
-
-## 为什么它零运行时依赖
-
-**宿主半边不运行时导入 DSH 包。** 服务通过 Cordis 的 `ctx` 获取，消费的结构声明在 [`src/dsh.ts`](src/dsh.ts)。浏览器保留既有的三个静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；最后一个是宿主 shell 提供的 static module，也是“不导入任何 DSH 包”这句话原本就存在的例外。插件没有新增 DSH 运行时依赖，`dependencies` 为空；`Config` 继续使用手写 Standard Schema。
-
-开发依赖包含 TypeScript、Node/React 类型、esbuild，以及用于类型检查的 primitives 和 Cordis。它们不会打入客户端 bundle，也不会在宿主入口导入。结构声明仍有版本漂移风险，可用 `node scripts/check-host-contracts.mjs '/path/to/DSH checkout'` 对照已构建 checkout 的正式声明。
-
-## 安装与开发
-
-本仓库是会话桥接的独立源码入口，旧统一仓库中的副本已经停止维护。先构建根宿主，再按[开发指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/build-cordis-plugins.zh.md)安装本目录依赖、检查、构建和打包。pnpm 11 配置在 `pnpm-workspace.yaml`；本包使用自己的 `packageManager`，不改宿主的版本。
-
-Desktop 通过“插件 → 添加插件”安装已构建目录或 `.tgz`；CLI/Web 的独立 profile 按[安装指南](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/docs/cookbook/install-cordis-plugins.zh.md)操作。Bundle 自带的 [`cordis.patch.yml`](cordis.patch.yml)负责挂载，不需要手写 Bundle 清单。同一 profile 保持一个正式实例，不与旧 `session-bridge-dev` 别名同时启用，否则会重复注册工具。
-
-宿主模块热更新和客户端 bundle 热更新是两条链路；桌面 `hmr.root: []` 禁止宿主代码监听。新增客户端声明或调整依赖后，需要核对目标宿主的缓存行为；重新启动目标进程可避免沿用旧导出或元数据。源码中的宿主补丁不自动进入另一份已安装的 app.asar，也不包含在本插件包里。
-
-各次现场修复与部署状态保留在 [HANDOVER.md](HANDOVER.md)、[REPAIR_REPORT.md](REPAIR_REPORT.md)和[边界记录](PLUGIN_BOUNDARIES.md)，其中旧路径和阶段状态属于历史证据；当前维护入口见[仓库说明](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/CORDIS.md)。
+验证层次见 `COMPATIBILITY.json`：macOS x64 上的 rc.2 定制 Host 是当前集成基线。local.5 曾通过真实浏览器复制及 1280/600px 单行检查；归档删除曾通过确认、取消、文件保留和重启不恢复检查。本版不改变这些运行字节。本轮发行检查不等于重新验收原生 Electron 点击或真实模型；Windows、Ubuntu、Apple Silicon 及官方 0.2.1-alpha.1 未做本插件全功能验收。
 
 ## 配置
 
-全部字段可选，都有默认值。在 profile patch 行里覆盖：
+所有字段可选。Bundle 已声明正式实例，不要再插入第二个插件行。需要覆盖时，在目标 profile patch 中按既有 ID 更新配置：
 
 ```yaml
 - id: session-bridge
-  name: '@missher/dsh-session-bridge'
   config:
     scratchRoot: /tmp
     scratchPrefix: dsh-session-
 ```
 
-| 字段 | 默认 | 含义 |
-|---|---|---|
-| `scratchRoot` | POSIX `/tmp`，Windows 平台临时目录 | 临时目录的父目录 |
-| `scratchPrefix` | `dsh-session-` | `mkdtemp` 前缀，后面跟 6 位随机字符 |
-| `registerScratchWorkspace` | `true` | 把临时目录注册为持久工作区，使其出现在侧边栏 |
-| `maxListedSessions` | `40` | `session_list` 单次返回上限 |
-| `maxTranscriptTurns` | `20` | `session_read` 保留的最新回合数 |
-| `maxMessageChars` | `8000` | `session_send` / `/bridge` 单条消息字符上限 |
-| `wakeColdSessions` | `true` | 允许唤醒冷会话以投递消息 |
-| `announceSessionId` | `true` | 在系统提示里告诉每个会话自己的 ID 与跨会话工具 |
+| 字段 | 默认值 | 含义 |
+| --- | --- | --- |
+| `scratchRoot` | POSIX `/tmp`；Windows 系统临时目录 | 临时目录的父目录。 |
+| `scratchPrefix` | `dsh-session-` | 一次性目录前缀。 |
+| `registerScratchWorkspace` | `true` | 将工具创建的临时目录注册为工作区，包含 `session` 与 `directory` 模式。 |
+| `maxListedSessions` | `40` | 单次列举上限。 |
+| `maxTranscriptTurns` | `20` | 最近转写回合上限。 |
+| `maxMessageChars` | `8000` | 单条跨会话消息字符上限。 |
+| `wakeColdSessions` | `true` | 允许唤醒冷会话投递；使用 Host 会话创建/恢复流程。 |
+| `announceSessionId` | `true` | 系统提示中声明自身 ID 和跨会话工具。 |
 
-## 人类侧界面
+## 停用、卸载与数据
 
-### 「新会话」里的「不在工作区」
+在 Desktop 或 Web 的插件管理里关闭该 Bundle，按提示重新加载；重新打开开关即可启用。停用移除本插件的工具、命令、样式与界面入口，侧栏排序恢复 Host 默认行为。
 
-新建会话时，工作区选择器底部多一行 **「✨ 不在工作区（临时目录）…」**（就在「➕ 添加工作区...」下面）。点一下选择配置根目录下的 `dsh-scratch` 工作区；macOS 默认规范路径为 `/private/tmp/dsh-scratch`，然后由宿主打开会话。实际界面点击验收状态见修复报告。
-
-**只有一个，而且有名字。** 侧边栏里出现的项目固定叫 **「不在工作区」**，反复用也不会多出第二个。早先的版本每次点击都新开一个 `dsh-session-XXXXXX` 目录，于是每点一次侧边栏就多一个随机名的项目——那正是这个功能本来要避免的乱象。
-
-选择器只保留一个入口，排在同一滚动列表的最后，不设独立 footer。注册后沿用真实 ID 和用户保存的标题；尚未注册时显示创建入口。打开菜单只查询配置目录对应的工作区 ID，不创建目录或会话。同名的其他项目保留原位。
-
-支持 `uiWorkspace.registerTrailingWorkspace` 的宿主还会把这一个工作区组排在侧栏同一列表的其他分组之后，与其他组一起滚动。单列表和搜索沿用宿主的会话列表。该注册只改变显示顺序，不迁移会话、不修改标题或持久排序；停用插件即恢复普通顺序。旧宿主仍可使用菜单，需要 ui-workspace 宿主补丁才能调整侧栏顺序。
-
-**为什么它还是个工作区（而不是真的「不在工作区」）。** DSH 里 `blank` 只在 `turn/start` 时清除（`api/session-controller/src/list.ts`），而新会话在输入第一个字之前一定是 blank；`ConversationContent` 里 `inert = sessionId === undefined || (hero && chipTitle === undefined)`，而 `chipTitle` 在没有归属工作区时是 `undefined`（注释里第 5 种情况：列表已就绪但没有归属工作区 → 占位符）。合起来就是：**没有工作区的新会话输入框是禁用的**，建出来也打不了字。所以这一行必须注册一个工作区，能做的只是让它只有一个、并且叫得清楚。
-
-**现在的调用链。** 浏览器 POST 固定的 `api/session-bridge/ensure-workspace`，宿主通过 Connection 的 Fetch 注册扩展点接入已有 `/api` 鉴权和来源检查。宿主在配置的 `scratchRoot` 下创建固定的 `dsh-scratch`，取 `realpath`，然后一次 `workspaceRegistry.create(path, title)` 完成注册。已有注册保留其标题，不改掉用户的重命名。客户端随后用工作区 store 的幂等 `create({ path })` 接入这条规范路径，让 owner 的 `onPick(workspaceId)` 能马上找到它。全程不创建、归档一次性会话，也不调用 native 选择器不提供的 browse 能力。
-
-注册路由只接收标题，不接受浏览器指定文件路径。固定目录若是符号链接、非本用户所有或可被组/其他用户写入，接口会明确失败。注册或网络中断可能留下目录或已注册工作区；重试会复用它。真正完全不注册工作区的 GUI 会话没有在本次实现。
-每一步宿主调用都包在 `try`/`catch` 里，失败走这个选择器自己的错误对话框——复刻别人的控件就得接管它的失败姿态，异常逃逸会把整个新会话界面拖垮。
-
-### 清理用过的临时项目：`/scratch-clean`
-
-```
-/scratch-clean         # 先看会删什么
-/scratch-clean yes     # 真删
-```
-
-只动**规范化临时根目录下、且里面没有任何非空白会话**的一次性项目（目录一起删）。固定的 `dsh-scratch` 工作区始终排除。判定条件里「空白会话也算」是故意的：点一次「不在工作区」就会留下一个空白会话，只按「零会话」判永远清不掉。
-
-你自己的项目、以及任何有真实对话的临时项目都不会被碰。宿主侧的 `workspaceRegistry.delete()` 本身只注销不删目录，所以这条命令额外做了 `rm`——清理一次性目录是它的全部目的。
-
-### 会话头部的「复制会话 ID」
-
-DSH 原本会在会话头部把 `sessionId` 当成面包屑文本渲染出来（`ConversationSession.tsx`：`{ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}`），但它是**纯文本，没有任何复制入口**。所以 `session_send` 需要的那个 ID，人在界面上拿不到——功能等于半残。
-
-客户端半边补上了这一环，挂在 `conversation.session.header.actions`（会话标题旁那一条动作带，和「创造模式」标签、后台任务计数并排），order 取 `0`，落在 agent-preset(-10) 之后、job-list(20) 之前：
-
-- **收起时**：直接显示完整会话 ID（包含 `session-` 前缀），点一下复制相同的完整 ID。保持完整单行显示，不换行、不省略中间字符。
-- **展开后**（caret）：三行各自带复制按钮——会话 ID、工作目录、以及 `在其他会话里引用` 给出的 `/bridge <session-id> ` 前缀（粘到另一个会话的输入框就能给它发消息）。
-- 复制失败会显示 `复制失败` 而不是静默什么都不做：优先用异步 Clipboard API（loopback 是安全上下文），失败则退回 `execCommand`。
-
-侧栏会话的三点菜单也提供 **复制会话 ID**、**复制工作目录** 和 **复制 /bridge 引用**，包括归档会话。动作读取被点击行的会话信息，不切换当前会话，也不唤醒历史会话；复制结果通过独立提示显示。会话目录尚未加载时会明确提示，不能用当前会话的目录代替。
-
-归档行增加「删除会话…」：先显示确认框，确认后永久删除聊天记录，保留工作区文件。宿主补丁负责释放本 API 持有的空闲会话、删除历史与归属；运行中、其他写入者占用或存在派生子会话时拒绝。旧宿主会明确提示更新，插件不直接读写宿主私有日志。工作区标题栏的归档图标也属于宿主补丁。作用域、验收与升级步骤见 [SESSION_ACTIONS.md](SESSION_ACTIONS.md)。
-
-文案走 DSH 的 client locale 服务注册（`sessionBridge` 命名空间，中英双份），所以跟随应用语言，不从浏览器猜。
-
-### 客户端工程约定
-
-- 源码 `src/client/`，用 esbuild 打包成 CJS，再包进 `window.__ModuleLoader__.load({ id, factory })`——DSH 逐字服务 `exports["./client"]` 并这样求值。
-- 仅三个既有静态模块 external：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`。新增运行时模块会被产物加载自检拒绝。
-- `tsconfig.client.json` 严格检查所有客户端 TS/TSX；`pnpm build` 必须先通过这一步。`watch:client` 只是转译监听，提交或验收前仍须执行完整 `pnpm build`。
-- `scripts/check-client-load.mjs` 用 stub loader 求值产物并断言 `inject`/`apply`；客户端行为测试覆盖请求失败、规范路径接入顺序和 store 返回类型。它们不能替代真实 Electron 点击。
-
-## 模型侧工具
-
-| 工具 | 作用 |
-|---|---|
-| `session_list` | 列出所有会话：ID、标题、工作目录、是否 live / 正在跑回合。`include_subagents` 默认 `false`。 |
-| `session_read` | 读取另一个会话最近的对话（只有 user / assistant 文本回合，工具结果和思维链被排除）。只读，不会 resume 或打扰对方。 |
-| `session_send` | 把消息投进另一个会话。`mode: steer`（默认）在对方最近的步骤边界送达、对方空闲时开启新回合；`mode: turn` 始终排一个独立的新回合。 |
-| `session_scratch` | `mode: session`（默认）在临时目录里新建会话；`mode: directory` 只给当前会话一个临时目录。模型开的临时会话仍是每次一个新目录（隔离优先）；人类侧那一行才是复用同一个「不在工作区」。 |
-
-**寻址。** `session_id` 参数接受精确 ID、精确标题、或唯一的 ID 前缀 —— 对应 Codex `codex resume` / `codex queue --thread` 的「UUID 或会话名，UUID 优先」。歧义前缀会被拒绝并列出候选，不做猜测。
-
-## 人类侧命令
-
-| 命令 | 作用 |
-|---|---|
-| `/sessions [过滤词]` | 列出会话 ID 与标题，方便复制 |
-| `/scratch [标签]` | 新建一个临时目录会话 |
-| `/bridge <会话 ID 或标题> <消息>` | 直接给另一个会话发消息 |
-| `/scratch-clean [yes]` | 清理临时根目录下没在用的一次性项目 |
-
-`/bridge` 的目标可以含空格：它会用**能解析成唯一会话的最长前导词跨度**作为目标，其余部分作为消息体。
-
-## 投递语义
-
-- 消息在接收方日志里是一条真实的 `user/message`，`source.kind` 为 `session-bridge`，携带 `senderSessionId` / `senderTitle` / `messageId`。它因此能被压缩、被回放、在接收方界面上可见。
-- 正文外面套一层固定框架，明确说明这是**同伴请求而非本人指令**，并附上回信的 `session_send` 调用方式。
-- 冷会话通过 `ctx.sessionController.create({ sessionId, cwd })` 唤醒 —— 也就是 Web 界面「新会话」走的同一条路，因此预设组合与模型选择都被正确安装；没有 controller 时退回 `ctx.agents.resume`。
-- 拒绝而不抛错的场景：给自己发、空正文、引用无法解析或歧义、冷会话且 `wakeColdSessions: false`、对方拒绝接收。
-
-## 设计参考
-
-跨会话部分对照了 OpenAI Codex 与 Claude Code 的实现：
-
-- **两个动词，不是一个。** Codex 把 `send_message`（"Does not trigger a new turn"）和 `followup_task`（"trigger a turn if it is idle"）分成两个工具。本插件的 `steer` / `turn` 对应这个区分。
-- **UUID 或名字。** 两家的 resume 与 messaging 都同时接受标识符和人类可读名字，标识符优先。
-- **不要用文件做传输。** Codex 走共享 app-server 的 JSON-RPC，Claude Code 走带鉴权行的 Unix domain socket；两者都刻意避开了 spool 目录 —— 它没有投递确认、没有鉴权、也无法与回合原子绑定。本插件走 Agent 自己的 inbox，因此消息受接收方回合机制约束，而不是绕过它写历史。
-- **发现动词 + 提示词指引。** Claude Code 用强制性的 "you MUST use the SendMessage tool" 段落加 `ListPeers`；本插件用 `session_list` 加每个会话作用域内的 `## Sessions and scratch space` 段落。
-
-尚未实现、但值得下一步做的：接收方人工审批（Claude Code 的 `held | denied | expired | delivered` 加异步回执）—— 目前靠固定框架声明「同伴请求」加 `wakeColdSessions` 开关来约束。
-
-## 测试
-
-插件维护、样式归属和独立交付边界见 [PLUGIN_BOUNDARIES.md](PLUGIN_BOUNDARIES.md)。常规测试包含样式归属回归；真实宿主模块系统的可重跑集成命令也在该文档中。
+卸载使用同一插件管理入口。Web CLI 用户也可以：
 
 ```sh
-node --test "tests/*.test.mjs"
+dsh plugin --profile web remove @missher/dsh-session-bridge
 ```
 
-39 条离线测试覆盖跨会话逻辑、四条命令、固定工作区规范路径、重试与卸载，以及客户端 store 接入。类型检查、离线测试、真实 Host HTTP 集成和 Electron 点击属于不同验证层，结果见 [REPAIR_REPORT.md](REPAIR_REPORT.md)。
+停用/卸载不会删除现有聊天记录、已投递消息、工作区或临时目录里的文件，也不会撤销已经开始的目标会话任务。Host 中独立保存的配置覆盖项可在确认不再需要后手动移除。回退时通过同一安装入口装回保留的旧 tarball；无需替换整个会话库。
 
-## 目录
+## 隐私与权限
 
-```
-src/dsh.ts                 宿主服务的结构化签名 + 可选服务 get 查询
-src/catalog.ts             会话发现、引用解析、转写投影
-src/delivery.ts            跨会话投递与冷会话唤醒
-src/message.ts             桥接消息信封与来源标记
-src/scratch.ts             临时目录与临时会话
-src/scratch-route.ts       固定工作区的受鉴权 HTTP 路由
-src/scratch-wire.ts        插件请求与返回边界
-scripts/check-host-contracts.mjs  对照宿主正式类型声明
-src/tools.ts               四个模型侧工具
-src/commands.ts            四条人类侧命令
-src/prompt.ts              每会话的系统提示段落
-src/index.ts               插件入口、Config、apply
-src/client/index.tsx       浏览器半边：slot 注册、样式、locale、宿主调用
-src/client/SessionIdChip.tsx  会话头部：会话标识芯片与展开面板
-src/client/ScratchWorkspacePicker.tsx  新会话：工作区选择器 + 临时目录行
-src/client/clipboard.ts    纯函数：ID 缩写、剪贴板载荷与降级
-src/client/locales.ts      中英词典
-scripts/build-client.mjs   esbuild + __ModuleLoader__ 包装
-scripts/check-client-load.mjs  构建产物求值自检
-```
+本插件没有独立遥测或外部上传服务；界面请求使用 Host 自身受鉴权的 HTTP 接口。它能通过 Host 读取会话目录和用户/助手文本，并向其他会话发送真实消息。目标模型处理收到的内容时，仍遵循目标会话的供应商、权限与费用设置。只向有权接收内容的会话投递，先确认目标。
 
-MIT.
+跨会话信封标注来源及“同伴请求”，但没有额外人工审批队列或权限隔离层。它不提供聊天备份、账户间同步或跨 Host 通信。反馈问题时提供版本、步骤及脱敏错误，不提交会话库、API Key 或 Cookie。
 
 ## 独立源码开发
 
-运行包已包含 lib，使用时不需要开发环境。修改源码需 Node 和本仓库 packageManager 指定的 pnpm；先运行 `node scripts/link-harness.mjs /绝对路径/已构建的Missher-DSH-Inter`，再执行 `pnpm install --frozen-lockfile`，随后使用 package.json 中的 typecheck、build 和 test。SDK 链接只写本插件开发目录；harness-sdk 不提交、不进入安装包。
+本仓库是唯一维护入口。使用 Node `>=22.19` 和 `packageManager` 指定的 pnpm `11.1.3`，并准备已构建的 rc.2 Harness SDK：
+
+```sh
+node scripts/link-harness.mjs /absolute/path/to/built-harness
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
+node --test --test-concurrency=1 "tests/*.test.mjs"
+pnpm pack --pack-destination ./dist
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.3-local.6.tgz
+```
+
+SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。
+
+`build` 包含严格客户端类型检查和客户端模块加载自检；watch 仅转译，不能代替验收。源码 checkout 不等于已安装 app.asar，修改代码后必须核对目标应用实际加载的包；桌面禁用 HMR 或元数据缓存可能要求重启。
