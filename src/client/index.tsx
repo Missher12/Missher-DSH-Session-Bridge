@@ -1,6 +1,5 @@
-/** Browser half: the session ID control and the shared scratch workspace picker. */
+/** Browser half: sidebar session actions and the shared scratch workspace picker. */
 
-import { SessionIdChip } from './SessionIdChip.js'
 import { ScratchWorkspacePicker } from './ScratchWorkspacePicker.js'
 import type { ScratchPickerInjected } from './ScratchWorkspacePicker.js'
 import { en, NS, zh } from './locales.js'
@@ -32,12 +31,6 @@ export type { ScratchWorkspacePickerProps, ScratchPickerInjected } from './Scrat
  */
 export const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions']
 
-/** The slot this half occupies: the session header's title-adjacent action band. */
-const SLOT = 'conversation.session.header.actions'
-
-/** This entry's cell id inside that band. */
-const ENTRY_ID = 'session-identity'
-
 /** The blank-session picker cell this half replaces, to add the scratch row. */
 const HERO_PICKER_SLOT = 'conversation.hero.workspace'
 
@@ -52,16 +45,6 @@ const HERO_PICKER_ID = 'session-bridge-picker'
  * the default 0, so anything below zero shadows it.
  */
 const HERO_PICKER_PRIORITY = -1
-
-/**
- * Where the chip sits among its neighbours.
- *
- * The band currently holds the subagent lineage (-30), the agent-preset label
- * (-10), and the background-job counter (20). Session identity belongs with the
- * other facts about *this* session, so it lands between the preset label and
- * the job counter rather than at the far edge.
- */
-const ENTRY_ORDER = 0
 
 /** Style element id, so a hot reload replaces its own sheet instead of stacking copies. */
 const STYLE_ID = 'dsh-session-bridge-styles'
@@ -218,7 +201,7 @@ function installStyles(): () => void {
 }
 
 /**
- * Client plugin body: register the dictionaries, the header chip, and the
+ * Client plugin body: register the dictionaries, sidebar actions, and the
  * extra New-Session row.
  * @param ctx - client root context.
  */
@@ -234,12 +217,6 @@ export function apply(ctx: ClientContextLike): void {
   ctx.effect(() => () => { copyActions.dispose() }, 'session-bridge: sidebar actions')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'session-bridge: dictionaries')
   ctx.effect(installStyles, 'session-bridge: styles')
-  ctx.slots.inject(SLOT, () => ctx.slots.register({
-    name: SLOT,
-    id: ENTRY_ID,
-    order: ENTRY_ORDER,
-    locale: NS,
-  }, SessionIdChip))
   // Replaces the blank-session picker so its menu can carry the one row DSH
   // has no seam for. See ScratchWorkspacePicker's module doc for why this is a
   // replacement rather than a contribution.

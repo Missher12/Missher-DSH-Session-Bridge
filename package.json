@@ -1,6 +1,6 @@
 {
   "name": "@missher/dsh-session-bridge",
-  "version": "0.1.3-local.6",
+  "version": "0.1.3-local.7",
   "private": true,
   "description": "Session IDs, cross-session messaging, and scratch workspaces for DeepSeek Harness.",
   "keywords": [

@@ -1,30 +1,33 @@
 # Session Bridge
 
+Current Git delivery: **0.1.3-local.7**. Source and frozen runtime match; see [validation and installation limits](./PUBLICATION.md). Git sync does not update installed devices.
+
+
 [中文](README.md) | English · [Desktop and downloads](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [All plugins](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.md)
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **0.1.3-local.6**.
-- This release changes packaging, licenses and documentation only. `src/` and `lib/` retain the accepted local.5 bytes.
+- Package: `@missher/dsh-session-bridge`; version: **0.1.3-local.7**.
+- This release removes the conversation-header identity control. Copy the full ID, working directory and session reference from the sidebar menu.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 
 ## Install a pinned version
 
-Download `missher-dsh-session-bridge-0.1.3-local.6.tgz` and `SHA256SUMS` from [Release v0.1.3-local.6](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.6). Release assets are published by the maintainer; until that tag appears, this version remains a release candidate. GitHub's automatic source archive is not the plugin tarball.
+Download `missher-dsh-session-bridge-0.1.3-local.7.tgz` and `SHA256SUMS` from [Release v0.1.3-local.7](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.7). Release assets are published by the maintainer; until that tag appears, this version remains a release candidate. GitHub's automatic source archive is not the plugin tarball.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 ```text
-https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.6/missher-dsh-session-bridge-0.1.3-local.6.tgz
+https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.7/missher-dsh-session-bridge-0.1.3-local.7.tgz
 ```
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
 
 ```sh
-dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.6/missher-dsh-session-bridge-0.1.3-local.6.tgz
+dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3-local.7/missher-dsh-session-bridge-0.1.3-local.7.tgz
 ```
 
 A local tarball's absolute path can replace the URL. Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do not enable the old `dsh-session-bridge`, the `session-bridge-dev` alias and the scoped package together: they register the same tools, including `session_list`. Keep the previous package/configuration and let active work finish before reloading an upgrade.
@@ -33,9 +36,7 @@ A local tarball's absolute path can replace the URL. Use separate `DSH_HOME` / `
 
 ### Session identity and menus
 
-The conversation header shows the complete ID, including `session-`, on one line at the original font size. Click to copy it. The adjacent disclosure button offers the ID, working directory and `/bridge <session-id> ` reference. The sidebar's session menu offers the same actions, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback.
-
-A header narrower than the full ID plus fixed controls has a physical layout limit. The plugin does not hide that limit by shortening the ID or shrinking the font.
+Use the sidebar session menu to copy the complete session ID, working directory or `/bridge <session-id> ` reference, including from archived rows. Actions use the selected row without switching the current session. Missing directory information and clipboard failures produce feedback. The conversation header no longer contains the session identity control.
 
 ### “Not in a workspace” and scratch
 
@@ -79,7 +80,7 @@ There is no hard Host version gate. Admission does not prove compatibility: the 
 
 The Host enforces deletion guards for running sessions, other writers and derived child sessions. The plugin calls the public operation; it does not infer or edit private Host logs. Updating the plugin alone cannot add missing Host extensions.
 
-See `COMPATIBILITY.json` for evidence layers. The current integration baseline is a custom rc.2 Host on macOS x64. local.5 previously passed real-browser copying and single-line checks at 1280/600px; archived deletion previously passed confirmation, cancellation, workspace-file preservation and absence after restart. This packaging release preserves those runtime bytes. Current release checks do not constitute a new native Electron or real-model acceptance run. Full plugin behavior has not been accepted on Windows, Ubuntu, Apple Silicon or official 0.2.1-alpha.1.
+See `COMPATIBILITY.json` for evidence layers. The macOS x64 custom rc.2 checks for local.5 are historical, including browser copying and archived deletion. This release uses an isolated Linux build to verify removal of the header registration and retention of sidebar copying; declaration and runtime sources are recorded separately. Offline checks do not replace native Electron clicks, real-model calls or full cross-platform acceptance.
 
 ## Configuration
 
@@ -132,7 +133,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.3-local.6.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.3-local.7.tgz
 ```
 
 The SDK link is for development only and is neither committed nor packaged. The tarball contains compiled runtime files, corresponding source, licenses and user documentation; development scripts and historical local receipts remain in Git. The Node entry uses structural `ctx` services without runtime imports from `@deepseek-ai/dsh-*`. The client keeps three existing Host static requests: `react`, `react/jsx-runtime` and `@deepseek-ai/dsh-client-ui-primitives`. No runtime dependencies were added.

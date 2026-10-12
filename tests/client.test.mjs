@@ -73,6 +73,33 @@ it('copies the chosen sidebar row ID, cwd and bridge reference without opening t
   actions.dispose()
 })
 
+it('keeps identity copying in the sidebar menu without adding a conversation header control', () => {
+  const registrations = []
+  client.apply({
+    effect() {},
+    locale: { register: () => () => {} },
+    uiWorkspace: {},
+    sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
+    workspaces: { list: { getSnapshot: () => ({ archivedSessionIds: [] }), subscribe: () => () => {} } },
+    slots: {
+      inject(_name, register) { register() },
+      register(options, component) { registrations.push({ ...options, component }); return () => {} },
+    },
+  })
+  assert.equal(registrations.some(entry => entry.name === 'conversation.session.header.actions'), false)
+  const copies = registrations.filter(entry => entry.name === 'sidebar.workspaces.session.menu.item'
+    && entry.id.startsWith('dsh-session-bridge.copy-'))
+  assert.deepEqual(copies.map(entry => entry.id), [
+    'dsh-session-bridge.copy-id', 'dsh-session-bridge.copy-cwd', 'dsh-session-bridge.copy-bridge',
+  ])
+  for (const entry of copies) {
+    assert.equal(typeof entry.component, 'function')
+    assert.equal(typeof entry.inject().copyReference, 'function')
+  }
+  assert.equal(registrations.filter(entry => entry.id === 'session-bridge-picker').length, 1)
+  assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.copy-notice').length, 1)
+})
+
 it('reports a missing cwd or clipboard rejection without inventing a directory', async () => {
   const copied = []
   const actions = client.createSessionCopyActions({ list: { getSnapshot: () => ({ byId: {} }) } },
