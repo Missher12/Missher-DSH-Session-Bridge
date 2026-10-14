@@ -13,6 +13,10 @@ runInNewContext(source, { fetch: (...args) => request(...args), window: { __Modu
   })
 } } } })
 
+
+/* The chip/panel behaviour lives in tests/chip-panel.test.mjs, which drives the
+   real React renderer and jsdom; this file stays dependency-free. */
+
 it('adopts the canonical workspace in the client store before navigation, without any disposable session', async () => {
   const calls = []
   request = async (path, options) => {
@@ -73,7 +77,7 @@ it('copies the chosen sidebar row ID, cwd and bridge reference without opening t
   actions.dispose()
 })
 
-it('keeps identity copying in the sidebar menu without adding a conversation header control', () => {
+it('registers exactly one conversation-header identity control and keeps sidebar copying', () => {
   const registrations = []
   client.apply({
     effect() {},
@@ -86,7 +90,14 @@ it('keeps identity copying in the sidebar menu without adding a conversation hea
       register(options, component) { registrations.push({ ...options, component }); return () => {} },
     },
   })
-  assert.equal(registrations.some(entry => entry.name === 'conversation.session.header.actions'), false)
+  // The header control is back by explicit user request: the id must be
+  // readable as a whole where the session title is, not only behind a menu.
+  const headers = registrations.filter(entry => entry.name === 'conversation.session.header.actions')
+  assert.equal(headers.length, 1, 'exactly one header cell is registered, never a duplicate')
+  assert.equal(headers[0].id, 'session-identity')
+  assert.equal(headers[0].order, 0, 'the chip sits between the preset label (-10) and the job counter (20)')
+  assert.equal(headers[0].locale, 'sessionBridge', 'the cell reads its strings from the registered namespace')
+  assert.equal(typeof headers[0].component, 'function', 'the registered cell renders the shipped chip component')
   const copies = registrations.filter(entry => entry.name === 'sidebar.workspaces.session.menu.item'
     && entry.id.startsWith('dsh-session-bridge.copy-'))
   assert.deepEqual(copies.map(entry => entry.id), [

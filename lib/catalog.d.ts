@@ -64,6 +64,8 @@ export interface Transcript {
  * @param selfId - the asking Session's id, marked `self` and excluded from `others`.
  * @param limit - maximum rows returned.
  * @returns at most `limit` rows ordered newest first.
+ * @throws when this Host provides neither listing seam, rather than reporting
+ * an empty Host: "no Sessions" and "cannot see Sessions" must stay distinct.
  */
 export declare function listSessionRows(ctx: HostContext, selfId: string, limit: number): Promise<SessionRow[]>;
 /**

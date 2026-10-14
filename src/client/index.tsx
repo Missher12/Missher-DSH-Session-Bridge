@@ -1,5 +1,6 @@
-/** Browser half: sidebar session actions and the shared scratch workspace picker. */
+/** Browser half: the session ID control and the shared scratch workspace picker. */
 
+import { ChipPanelOverlay, createChipPanelActions, SessionIdChip } from './SessionIdChip.js'
 import { ScratchWorkspacePicker } from './ScratchWorkspacePicker.js'
 import type { ScratchPickerInjected } from './ScratchWorkspacePicker.js'
 import { en, NS, zh } from './locales.js'
@@ -16,11 +17,25 @@ import type { WorkspacePlacementSource } from './scratch-placement.js'
 export { createSessionDeleteActions } from './session-delete.js'
 export { createSessionCopyActions } from './session-menu.js'
 
-export { shortenSessionId, copyPayload, writeClipboard } from './clipboard.js'
-export { SessionIdChip } from './SessionIdChip.js'
-export type { SessionIdChipProps } from './SessionIdChip.js'
+export { copyPayload, shortenSessionId, writeClipboard } from './clipboard.js'
+export { ChipPanelOverlay, createChipPanelActions, SessionIdChip } from './SessionIdChip.js'
+export type { ChipPanelActions, ChipPanelState, SessionIdChipProps } from './SessionIdChip.js'
 export { ScratchWorkspacePicker } from './ScratchWorkspacePicker.js'
 export type { ScratchWorkspacePickerProps, ScratchPickerInjected } from './ScratchWorkspacePicker.js'
+
+/**
+ * The overlay cell the identity panel renders into.
+ *
+ * The panel cannot live inside the header: the action band sits under an
+ * ancestor with `overflow: hidden`, so an absolutely positioned panel is
+ * clipped there no matter how it is anchored. `shell.overlay` is the Host's own
+ * root-scope layer above the frame, which is where a panel that must not be
+ * clipped belongs.
+ */
+const OVERLAY_SLOT = 'shell.overlay'
+
+/** This overlay entry's cell id. */
+const OVERLAY_ID = 'session-bridge-identity-panel'
 
 /**
  * Required client services.
@@ -30,6 +45,30 @@ export type { ScratchWorkspacePickerProps, ScratchPickerInjected } from './Scrat
  * native chooser the New-Session row uses. `workspaces` adopts the returned registry record.
  */
 export const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions']
+
+/**
+ * The slot this half occupies: the session header's title-adjacent action band.
+ *
+ * This band is where a person looks for facts about *this* conversation, and
+ * the id is the one fact the bridge's cross-session tools need. The control
+ * shows the complete id on one line, and scrolls its text region sideways when
+ * the band is too narrow rather than shortening the id; the dsh-sbc- rules
+ * below carry the layout, and SessionIdChip renders it.
+ */
+const SLOT = 'conversation.session.header.actions'
+
+/** This entry's cell id inside that band. */
+const ENTRY_ID = 'session-identity'
+
+/**
+ * Where the chip sits among its neighbours.
+ *
+ * The band currently holds the subagent lineage (-30), the agent-preset label
+ * (-10), and the background-job counter (20). Session identity belongs with the
+ * other facts about *this* session, so it lands between the preset label and
+ * the job counter rather than at the far edge.
+ */
+const ENTRY_ORDER = 0
 
 /** The blank-session picker cell this half replaces, to add the scratch row. */
 const HERO_PICKER_SLOT = 'conversation.hero.workspace'
@@ -57,7 +96,30 @@ const STYLE_ID = 'dsh-session-bridge-styles'
  * `dsh-sbc-` to keep them out of the app's own namespace.
  */
 const STYLES = `
-.dsh-sbc-root { position: relative; display: inline-flex; align-items: stretch; gap: 0; inline-size: max-content; flex-shrink: 0; }
+/*
+ * One line, never shortened, always reachable.
+ *
+ * The header band is display flex with flex none on the actions band, the
+ * surrounding title cluster is min-width 0, and the active session root clips
+ * overflow. A percentage cap would resolve against the band's own content
+ * width, not the row's remaining space, so the chip measures the width left for
+ * it inside the clipping ancestor and writes that as an inline cap. The rules
+ * here are the part of the layout that can be expressed statically:
+ *
+ * - the id lives in its own scroll region (.dsh-sbc-chipId), so the complete
+ *   string stays on one line at every width and is read by scrolling that
+ *   region sideways. Only the glyphs move; nothing is wrapped, ellipsised, or
+ *   dropped, and no session- prefix is ever removed.
+ * - the copy icon and the caret are flex none siblings outside that region, so
+ *   a narrow window cannot scroll or shrink the buttons out of reach.
+ * - white-space: nowrap stops at the id line. The expanded panel is a separate
+ *   subtree with its own wrapping rules, so a long working directory or bridge
+ *   reference is readable rather than cut off.
+ */
+.dsh-sbc-root {
+  position: relative; display: inline-flex; align-items: stretch; gap: 0;
+  inline-size: max-content; min-inline-size: 0; flex-shrink: 0;
+}
 .dsh-sbc-chip, .dsh-sbc-caret {
   display: inline-flex; align-items: center; gap: 5px;
   min-height: 22px; padding: 3px 7px;
@@ -66,8 +128,8 @@ const STYLES = `
   font-size: 11px; line-height: 1.35; cursor: pointer;
   transition: color .12s ease, border-color .12s ease, background-color .12s ease;
 }
-.dsh-sbc-chip { border-radius: 6px 0 0 6px; border-right-width: 0; min-width: 0; }
-.dsh-sbc-caret { border-radius: 0 6px 6px 0; padding: 0 4px; flex-shrink: 0; }
+.dsh-sbc-chip { border-radius: 6px 0 0 6px; border-right-width: 0; min-inline-size: 0; }
+.dsh-sbc-caret { border-radius: 0 6px 6px 0; padding: 0 4px; flex: none; }
 .dsh-sbc-chip:hover, .dsh-sbc-caret:hover {
   color: var(--dsw-alias-label-primary);
   border-color: var(--dsw-alias-border-l2);
@@ -76,47 +138,73 @@ const STYLES = `
 .dsh-sbc-chip:focus-visible, .dsh-sbc-caret:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px;
 }
+/*
+ * The id's own scroll region. It may shrink to nothing so the buttons beside it
+ * stay put, and it scrolls sideways rather than wrapping, ellipsising, or
+ * cutting the string out of the document. Vertical overflow is hidden on
+ * purpose: horizontal scrolling must not create a vertical scrollbar that
+ * would change the control's height in the header. The tab stop is set in the
+ * component, so the glyphs past the right edge stay reachable by keyboard.
+ */
 .dsh-sbc-chipId {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  letter-spacing: -.02em; overflow-wrap: normal; white-space: nowrap; text-align: left;
+  letter-spacing: -.02em; overflow-wrap: normal; white-space: nowrap;
+  text-align: left; flex: 1 1 auto; min-inline-size: 0; inline-size: auto;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
-.dsh-sbc-chipIcon { display: inline-flex; opacity: .55; flex-shrink: 0; }
+.dsh-sbc-chipId:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.dsh-sbc-chipId::-webkit-scrollbar { inline-size: 0; block-size: 0; }
+.dsh-sbc-chipIcon { display: inline-flex; opacity: .55; flex: none; }
 .dsh-sbc-chip:hover .dsh-sbc-chipIcon { opacity: 1; }
 .dsh-sbc-chip[data-copy-state="copied"] { color: var(--dsw-alias-state-success-primary); border-color: var(--dsw-alias-state-success-primary); }
 .dsh-sbc-chip[data-copy-state="failed"] { color: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-primary); }
 .dsh-sbc-caretGlyph { transition: transform .14s ease; }
 .dsh-sbc-caretOpen { transform: rotate(180deg); }
+/*
+ * The panel renders in shell.overlay, above the frame, so it is positioned in
+ * viewport coordinates from the control's rect — see anchoredStyle in
+ * SessionIdChip. Only the placement is inline; everything structural is here.
+ * The white-space rule below re-establishes ordinary wrapping for the panel's
+ * own content, which inherits nothing from the header's id line.
+ */
 .dsh-sbc-panel {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
-  width: 384px; max-width: calc(100vw - 32px);
+  box-sizing: border-box; z-index: 60;
   padding: 10px 12px 12px;
   border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px;
   background: var(--dsw-alias-bg-overlay);
   box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
   display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto; overflow-x: hidden;
+  white-space: normal; text-align: start;
 }
 .dsh-sbc-panelTitle {
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--dsw-alias-label-secondary);
 }
-.dsh-sbc-row { display: flex; flex-direction: column; gap: 4px; }
+.dsh-sbc-row { display: flex; flex-direction: column; gap: 4px; min-inline-size: 0; }
 .dsh-sbc-rowHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dsh-sbc-rowLabel { font-size: 11px; color: var(--dsw-alias-label-secondary); }
 .dsh-sbc-rowCopy {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; padding: 0; cursor: pointer;
+  width: 20px; height: 20px; padding: 0; cursor: pointer; flex: none;
   border: 1px solid var(--dsw-alias-border-l1); border-radius: 5px;
   background: transparent; color: var(--dsw-alias-label-secondary);
 }
 .dsh-sbc-rowCopy:hover { color: var(--dsw-alias-label-primary); border-color: var(--dsw-alias-border-l2); }
 .dsh-sbc-rowCopy[data-copy-state="copied"] { color: var(--dsw-alias-state-success-primary); border-color: var(--dsw-alias-state-success-primary); }
 .dsh-sbc-rowCopy[data-copy-state="failed"] { color: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-primary); }
+/*
+ * Panel values wrap. A working directory or a /bridge reference is long and has
+ * no natural break opportunity, so the anywhere rule is what keeps it inside the
+ * panel instead of widening it or getting cut off.
+ */
 .dsh-sbc-rowValue {
   display: block; padding: 5px 7px; border-radius: 6px;
   background: var(--dsw-alias-bg-layer-2);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-size: 11px; color: var(--dsw-alias-label-primary);
-  overflow-wrap: anywhere;
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
 }
 .dsh-sbc-rowHint { margin: 0; font-size: 11px; line-height: 1.45; color: var(--dsw-alias-label-secondary); }
 .dsh-sbp-status {
@@ -201,8 +289,8 @@ function installStyles(): () => void {
 }
 
 /**
- * Client plugin body: register the dictionaries, sidebar actions, and the
- * extra New-Session row.
+ * Client plugin body: register the dictionaries, the header chip, the sidebar
+ * actions, and the extra New-Session row.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContextLike): void {
@@ -213,10 +301,27 @@ export function apply(ctx: ClientContextLike): void {
   }
   const copyActions = createSessionCopyActions(ctx.sessions)
   const deleteActions = createSessionDeleteActions(ctx.workspaces.list)
+  const chip = createChipPanelActions()
   ctx.effect(() => () => { deleteActions.dispose() }, 'session-bridge: deletion confirmation')
   ctx.effect(() => () => { copyActions.dispose() }, 'session-bridge: sidebar actions')
+  ctx.effect(() => () => { chip.dispose() }, 'session-bridge: identity panel')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'session-bridge: dictionaries')
   ctx.effect(installStyles, 'session-bridge: styles')
+  ctx.slots.inject(SLOT, () => ctx.slots.register({
+    name: SLOT,
+    id: ENTRY_ID,
+    order: ENTRY_ORDER,
+    locale: NS,
+    inject: (): { chip: typeof chip } => ({ chip }),
+  }, SessionIdChip))
+  // The panel is a sibling cell in the overlay layer, not a child of the chip:
+  // the header clips its overflow, so a panel rendered there would be cut off.
+  ctx.slots.inject(OVERLAY_SLOT, () => ctx.slots.register({
+    name: OVERLAY_SLOT,
+    id: OVERLAY_ID,
+    locale: NS,
+    inject: (): { chip: typeof chip } => ({ chip }),
+  }, ChipPanelOverlay))
   // Replaces the blank-session picker so its menu can carry the one row DSH
   // has no seam for. See ScratchWorkspacePicker's module doc for why this is a
   // replacement rather than a contribution.

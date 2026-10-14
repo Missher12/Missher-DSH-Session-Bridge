@@ -2,24 +2,28 @@
  * Pure helpers behind the session-identity chip.
  *
  * Kept free of React and of the DOM so they can be unit-tested under Node and
- * reasoned about on their own: how an id is shortened for display, exactly
- * what each copy affordance puts on the clipboard, and how a clipboard write
- * degrades when the async Clipboard API is unavailable.
+ * reasoned about on their own: how an id is shortened for compact display,
+ * exactly what each copy affordance puts on the clipboard, and how a clipboard
+ * write degrades when the async Clipboard API is unavailable.
+ *
+ * The header chip does not use the short form: it renders the durable id in
+ * full and scrolls it when the header is narrow. This stays as the shared,
+ * tested display helper for any surface that genuinely needs a compact label.
  *
  * @module dsh-session-bridge/client/clipboard
  */
 
-/** How many leading characters of the id stay visible in the collapsed chip. */
+/** How many leading characters of the id stay visible in the compact form. */
 const SHORT_HEAD = 8
 
 /** How many trailing characters stay visible, so two similar ids still differ. */
 const SHORT_TAIL = 4
 
 /**
- * Shorten one session id for the collapsed chip while keeping it recognizable.
+ * Shorten one session id for compact display while keeping it recognizable.
  *
  * A DSH session id is `session-<uuid>`. Dropping the constant prefix and the
- * middle of the uuid leaves `af569227…791a`, which fits the header band beside
+ * middle of the uuid leaves `af569227…791a`, which fits a narrow label beside
  * the agent-preset label and the job counter.
  *
  * @param sessionId - the full durable session id.

@@ -429,3 +429,104 @@ describe('session bridge host half', () => {
     assert.ok(bare.registeredTools.has('session_scratch'))
   })
 })
+
+describe('session listing degradation', () => {
+  /** A Host with neither listing seam: no sessionController, no sessionQuery. */
+  function withoutListingSeams() {
+    const agents = new Map()
+    agents.set(SELF, fakeAgent(SELF, '/tmp/self'))
+    const fixture = fakeHost({ summaries: [], surfacesById: new Map(), agents })
+    delete fixture.host.sessionController
+    delete fixture.host.sessionQuery
+    apply(fixture.host, { scratchRoot: '/tmp', scratchPrefix: 'dsh-test-' })
+    return fixture
+  }
+
+  it('reports a missing listing seam instead of claiming the Host has no sessions', async () => {
+    const fixture = withoutListingSeams()
+    const { registeredTools, registeredCommands } = fixture
+    const agent = fixture.host.agents.get(SELF)
+    // The old behaviour returned an empty list here, which read as "no other
+    // sessions exist" and hid the real cause: this composition cannot list at all.
+    await assert.rejects(
+      callTool(registeredTools, 'session_list', {}, agent),
+      /cannot list sessions: the session-controller service is not mounted; the session-query service is not mounted.*sessionController\.list\(\) or sessionQuery\.listSessions\(\)/s,
+    )
+    // The slash command answers a human, so it turns the same cause into a
+    // readable error instead of an empty list.
+    const handler = registeredCommands.get('sessions').handler
+    const listed = await handler({ agent, rawInput: '', signal: new AbortController().signal })
+    assert.equal(listed.kind, 'error')
+    assert.match(listed.text, /Cannot list sessions: .*session-controller service is not mounted/)
+    assert.match(listed.text, /sessionController\.list\(\) or sessionQuery\.listSessions\(\)/)
+  })
+
+  it('names the method that is actually missing when only a partial seam exists', async () => {
+    // sessionQuery is mounted but carries no listSessions(); the controller is absent.
+    const agents = new Map()
+    agents.set(SELF, fakeAgent(SELF, '/tmp/self'))
+    const fixture = fakeHost({ summaries: [], surfacesById: new Map(), agents })
+    delete fixture.host.sessionController
+    fixture.host.sessionQuery = { readSurface: async () => { throw new Error('unused') } }
+    apply(fixture.host, { scratchRoot: '/tmp', scratchPrefix: 'dsh-test-' })
+    await assert.rejects(
+      callTool(fixture.registeredTools, 'session_list', {}, agents.get(SELF)),
+      /the session-controller service is not mounted; the mounted session-query service has no listSessions\(\) method/,
+    )
+  })
+
+  it('reports a mounted controller that lacks list() without calling it absent', async () => {
+    const agents = new Map()
+    agents.set(SELF, fakeAgent(SELF, '/tmp/self'))
+    const fixture = fakeHost({ summaries: [], surfacesById: new Map(), agents })
+    fixture.host.sessionController = {}
+    delete fixture.host.sessionQuery
+    apply(fixture.host, { scratchRoot: '/tmp', scratchPrefix: 'dsh-test-' })
+    await assert.rejects(
+      callTool(fixture.registeredTools, 'session_list', {}, agents.get(SELF)),
+      /the mounted session-controller service has no list\(\) method; the session-query service is not mounted/,
+    )
+  })
+
+  it('keeps the live-preferred query fallback when only the controller is absent', async () => {
+    const agents = new Map()
+    agents.set(SELF, fakeAgent(SELF, '/tmp/self'))
+    const surfacesById = new Map([
+      [SELF, surface(SELF, '/tmp/self', [])],
+      [PEER, surface(PEER, '/tmp/peer', [])],
+    ])
+    const fixture = fakeHost({ summaries: [], surfacesById, agents })
+    delete fixture.host.sessionController
+    apply(fixture.host, { scratchRoot: '/tmp', scratchPrefix: 'dsh-test-' })
+    const result = await callTool(fixture.registeredTools, 'session_list', {}, fixture.host.agents.get(SELF))
+    assert.deepEqual(result.sessions.map(row => row.session_id).sort(), [PEER, SELF].sort())
+    assert.equal(result.sessions.find(row => row.session_id === SELF).self, true)
+    assert.equal(result.sessions.find(row => row.session_id === PEER).self, false)
+  })
+
+  it('keeps the controller listing and its titles when only the query engine is absent', async () => {
+    const agents = new Map()
+    agents.set(SELF, fakeAgent(SELF, '/tmp/self'))
+    const fixture = fakeHost({
+      summaries: [{ sessionId: PEER, agentAvailable: true, updatedAt: 1, running: false, blank: false, cwd: '/tmp/peer', projections: { values: { title: 'Peer session' } } }],
+      surfacesById: new Map(),
+      agents,
+    })
+    delete fixture.host.sessionQuery
+    apply(fixture.host, { scratchRoot: '/tmp', scratchPrefix: 'dsh-test-' })
+    const result = await callTool(fixture.registeredTools, 'session_list', {}, agents.get(SELF))
+    // The asking session is live and the bridge also surfaces live agents the
+    // listing does not know about, so it appears as its own marked row rather
+    // than being dropped. The peer row is the one under test here.
+    const peer = result.sessions.find(row => row.session_id === PEER)
+    assert.deepEqual(peer, { session_id: PEER, title: 'Peer session', cwd: '/tmp/peer', live: true, running: false, updated_at: 1, self: false })
+    const self = result.sessions.find(row => row.session_id === SELF)
+    assert.equal(self?.self, true, 'the asking session is retained and marked as self')
+    assert.equal(result.sessions.length, 2, 'exactly the listed peer plus the live self row')
+    // Reading a transcript needs the query engine, and says so by name.
+    await assert.rejects(
+      callTool(fixture.registeredTools, 'session_read', { session_id: PEER }, agents.get(SELF)),
+      /session-query service is not mounted with readSurface\(\)/,
+    )
+  })
+})

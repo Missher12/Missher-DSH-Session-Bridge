@@ -1,61 +1,104 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.3-local.7",
-  "runtimeBaseline": "0.1.3-local.6",
-  "runtimeChanged": true,
+  "packageVersion": "0.1.3",
+  "candidateStatus": "source candidate awaiting reviewer package freeze; not published or installed",
   "hardHostVersionGate": false,
-  "checkedOn": "2026-10-12",
+  "checkedOn": "2026-10-14",
   "buildAndTestPlatform": "Linux x64",
   "buildNodeVersion": "22.22.1",
-  "developmentSdkVersion": "0.2.0-rc.2",
-  "developmentSdkRevision": null,
   "releaseChecks": {
-    "hostAndClientTypes": "passed using recorded declarations",
+    "hostAndClientTypes": "passed",
     "isolatedBuild": "passed",
     "offlineTests": {
-      "passed": 42,
+      "passed": 59,
       "failed": 0,
       "skipped": 0,
       "concurrency": 1
     },
-    "clientModuleLoad": "passed with Host static module stubs",
-    "registrationNegativeControl": "old local.6 bundle fails the new header-removal assertion as expected",
+    "clientModuleLoad": "passed with Host static module stubs and with both real community Host client Loaders",
+    "hostContracts": "passed against shared Host source SDK declarations; not packaged .d.ts",
+    "chipPanelBehaviourTests": "12 React and JSDOM tests over controlled geometry inputs; these are behavioural checks, not pixel or browser layout evidence",
+    "styleOwnership": "passed on the installed alpha.2 module system with the real Cordis Loader: peer reload, self reload and unload, single owned sheet, peer sheet preserved",
+    "archiveDeletion": "passed on Missher rc.2 with real browser clicks; synthetic records only",
     "nativeElectronClicks": "not run",
     "realModelCalls": "not run"
   },
-  "historicalAcceptance": {
-    "officialHosts": [
-      "0.2.0-rc.1",
-      "0.2.0-rc.2"
+  "hostMatrix": {
+    "note": "Two actual Missher community distributions, both modified for this desktop product. Neither is an unmodified official build. No host version number acts as a gate; every row is capability-based.",
+    "hosts": [
+      {
+        "distribution": "Missher community desktop, DSH 0.2.0-rc.2, Cordis 4.0.4",
+        "realLoaderAndHttp": "passed",
+        "clientBootGraph": "passed",
+        "bridgeActivations": 1,
+        "failedEnabledComponents": 0,
+        "uiWidths": [
+          "1280x800",
+          "600x800 with sidebar expanded"
+        ]
+      },
+      {
+        "distribution": "Missher community desktop, DSH 0.2.1-alpha.2, Cordis 4.0.5-alpha.1, desktop 0.2.1-alpha.2.20261014.1",
+        "realLoaderAndHttp": "passed",
+        "clientBootGraph": "passed",
+        "bridgeActivations": 1,
+        "failedEnabledComponents": 0,
+        "uiWidths": [
+          "1280x800",
+          "600x800 with sidebar expanded"
+        ]
+      }
     ],
-    "officialHostScope": "isolated loader/client checks; not all features or native UI",
-    "customHost": "Missher rc.2",
-    "customHostScope": "isolated browser copy, single-line ID at 1280/600px, archive-delete confirm/cancel/file preservation/restart checks",
-    "runtimeInstalledPreviously": "local.6 verified installed on this Linux profile on 2026-10-12; local.7 is an isolated candidate until coordinator installation"
+    "uiChecks": "single-line complete id, full-id copy, Home/End scrolling in the id region, detail panel and Escape, and natural width restored after growing the window; 0 console errors, 0 model requests, 0 external fetches"
   },
   "optionalHostExtensions": [
     {
       "capability": "sessionController.deleteArchivedSession",
-      "purpose": "permanent archived-history deletion",
-      "officialRc2": false,
-      "fallback": "hide delete entry; unsupported requests fail without accessing private storage"
+      "purpose": "permanent deletion of archived chat history",
+      "fallback": "the delete entry is hidden; an unsupported request answers POST 501 without reading private storage",
+      "coverage": "rc.2 real clicks for confirm, cancel and delete over synthetic records; the missing-capability branch is covered by a controlled fixture"
     },
     {
       "capability": "uiWorkspace.registerTrailingWorkspace",
-      "purpose": "place the scratch group last in the sidebar",
-      "officialRc2": false,
-      "fallback": "ordinary Host sidebar order"
+      "purpose": "place the scratch group after ordinary workspaces in the sidebar",
+      "fallback": "ordinary Host sidebar order",
+      "coverage": "fixture"
     }
   ],
-  "hostOwnedFeature": "dedicated workspace archive toolbar icon is not shipped by this plugin",
+  "hostOwnedFeature": "the dedicated workspace archive toolbar icon belongs to the Host and is not shipped by this plugin",
+  "deletionSemantics": "confirming deletes archived chat history only; files in the workspace and other sessions are preserved, and the deletion persists across a restart",
+  "runtimeSurface": {
+    "hostHalf": "no @deepseek-ai/dsh-* runtime import; every Host capability is reached through the Cordis context",
+    "clientHalf": "exactly three static requests: react, react/jsx-runtime, and @deepseek-ai/dsh-client-ui-primitives",
+    "noHostChanges": "no Host patch, row rename, HMR shim or package-manager bypass"
+  },
+  "developmentSdk": {
+    "pin": "0.2.0-rc.2 link for development only; not a compatibility gate",
+    "types": "declarations from the shared Host source SDK checkout; the packaged Host ships no .d.ts, so type verification is layered and does not claim packaged-declaration coverage"
+  },
   "notAccepted": [
-    "official DSH 0.2.1-alpha.1",
-    "Windows full plugin behavior",
-    "Ubuntu full plugin behavior",
-    "macOS arm64 full plugin behavior"
+    "unmodified official DSH builds",
+    "DSH versions and platforms other than the two listed distributions",
+    "native Electron click behaviour",
+    "real model calls",
+    "Windows, macOS arm64, or Ubuntu full plugin behaviour"
   ],
-  "developmentSdkEvidence": {
-    "runtime": "Installed Linux DSH 0.2.0-rc.2 package copies; package/runtime SHA manifest retained in candidate evidence",
-    "types": "Existing ui-primitives declarations from preserved DevMigration Host source checkout; exact file hashes retained, generation revision unknown"
+  "screenshots": {
+    "note": "All four are real IAB browser clicks over synthetic sessions in an isolated directory, not native Electron.",
+    "finalRuntimeBytes": {
+      "images": [
+        "docs/images/header-full-alpha2.png",
+        "docs/images/header-narrow-alpha2.png",
+        "docs/images/scratch-workspace-alpha2.png"
+      ],
+      "captureManifest": "0.1.3-local.7 diagnostic manifest",
+      "finalClientBundleSha256": "04aee89f50915de92811b209bfe15f56b8568b231a7ac2f1da860dfd2fdfdcda"
+    },
+    "archiveDeletion": {
+      "image": "docs/images/archive-confirm-rc2.png",
+      "fromEarlierBuild": true,
+      "evidence": "the four archive-deletion source files are unchanged since capture, so the real confirm/cancel/delete, workspace-file preservation and restart-persistence evidence is reused",
+      "notClaimed": "the archive image does not show the whole bundle at the final candidate revision"
+    }
   }
 }

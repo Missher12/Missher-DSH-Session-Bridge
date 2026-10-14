@@ -1,4 +1,18 @@
-# 0.1.3-local.7：简化会话顶部入口
+# Session Bridge 0.1.3：完整会话 ID 与能力兼容
+
+本批已完成独立验收，Git 源码与 `lib/` 对应冻结的 `0.1.3` 候选。会话顶部显示完整 ID，窄窗口仅滚动 ID 文字，复制与展开按钮保持可用；详情浮层避免标题栏裁切。README 新增四张使用合成数据的真实浏览器截图。
+
+宿主兼容按实际接口判断：会话列表可使用 Controller 或 Query 接口；两者都不可用时给出具体错误。归档删除依赖公开的可选 `deleteArchivedSession`，缺少时停用删除入口；不直接读写宿主私有会话存储，不锁定某个精确 Host 版本。
+
+已通过严格类型、构建、59 项测试，以及 Missher 社区 DSH `0.2.0-rc.2` 和 `0.2.1-alpha.2` 的真实 Loader/HTTP 与浏览器点击检查。包含 1280/600px、复制、浮层、归档确认/取消/删除/重启和工作区文件保留。未改动的官方发行包、macOS 原生窗口与真实模型投递仍未在本轮验证；截图不是这些平台的验收证明。
+
+冻结包：`missher-dsh-session-bridge-0.1.3.tgz`，SHA-256 `f722db704af3c5f64ec48452ccdf3d4d7ccade714ccf3fa1b75eb8128af033c3`。27 个运行文件与验收输出逐字节一致，见 [交付清单](GIT_DELIVERY.json) 与 [兼容矩阵](COMPATIBILITY.json)。开发清单保留 `packageManager`；打包工具移除该字段并调整键顺序，其余字段语义一致。
+
+本页记录 Git 交付；正式 Release 和日常安装尚待统一执行。当前可下载版本以 [Latest Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/latest) 为准；Git 推送不会自动替换已安装插件。旧包与历史标签保留用于回滚。
+
+## 上一批历史交付
+
+### 0.1.3-local.7：简化会话顶部入口
 
 2026-10-12 的 Git 交付包含本版本源码和逐文件匹配冻结安装包的运行文件，可供其他设备同步。原开发目录和历史安装包保留。
 

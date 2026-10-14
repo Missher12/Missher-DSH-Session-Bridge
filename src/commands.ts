@@ -64,7 +64,15 @@ export function registerBridgeCommands(ctx: HostContext, policy: ToolPolicy): vo
     handler: async (invocation: CommandInvocationLike): Promise<CommandResultLike> => {
       const filter = invocation.rawInput.trim().toLowerCase()
       const selfId = invocation.agent?.id ?? ''
-      const rows = await listSessionRows(ctx, selfId, 200)
+      let rows: Awaited<ReturnType<typeof listSessionRows>>
+      try {
+        rows = await listSessionRows(ctx, selfId, 200)
+      } catch (error) {
+        // A Host that cannot list sessions at all is a different answer from a
+        // Host with no sessions, and the human reading the command result is the
+        // one who can act on the difference.
+        return { kind: 'error', text: `Cannot list sessions: ${String(error instanceof Error ? error.message : error)}` }
+      }
       const matched = filter.length === 0 ? rows : rows.filter(row =>
         row.sessionId.toLowerCase().includes(filter)
         || (row.title ?? '').toLowerCase().includes(filter)

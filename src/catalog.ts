@@ -77,6 +77,44 @@ function summaryTitle(summary: SessionSummaryLike): string | undefined {
 }
 
 /**
+ * Whether one service exposes `name` as a callable method.
+ *
+ * A service can be mounted while a particular method is absent — an older or
+ * narrower composition, or a Host that never carried the upstream extension.
+ * The bridge must then take its honest degraded path instead of treating the
+ * missing method as an empty result.
+ *
+ * @param service - the mounted service, or `undefined`.
+ * @param name - the method to look for.
+ * @returns `true` only when the member is a function.
+ */
+function callable(service: unknown, name: string): boolean {
+  return typeof (service as Record<string, unknown> | undefined)?.[name] === 'function'
+}
+
+/**
+ * Build the diagnostic for a Host that can neither list Sessions nor read them.
+ *
+ * Reports the exact required method for each seam, and only states that a
+ * service is absent when it really is: a service that is mounted but lacks the
+ * method must not be described as missing, and a mounted service must not be
+ * described as absent. Cases are mutually exclusive.
+ *
+ * @param controller - the mounted Session Controller, if any.
+ * @param query - the mounted Session Query engine, if any.
+ * @returns the message for the thrown error.
+ */
+function noSessionListingReason(controller: unknown, query: unknown): string {
+  const parts: string[] = []
+  if (controller === undefined) parts.push('the session-controller service is not mounted')
+  else if (!callable(controller, 'list')) parts.push('the mounted session-controller service has no list() method')
+  if (query === undefined) parts.push('the session-query service is not mounted')
+  else if (!callable(query, 'listSessions')) parts.push('the mounted session-query service has no listSessions() method')
+  return 'session bridge cannot list sessions: ' + parts.join('; ')
+    + '; this Host must provide sessionController.list() or sessionQuery.listSessions()'
+}
+
+/**
  * List every Session the Host knows about, newest activity first.
  *
  * Prefers the Session Controller listing because it is the sidebar's own
@@ -87,6 +125,8 @@ function summaryTitle(summary: SessionSummaryLike): string | undefined {
  * @param selfId - the asking Session's id, marked `self` and excluded from `others`.
  * @param limit - maximum rows returned.
  * @returns at most `limit` rows ordered newest first.
+ * @throws when this Host provides neither listing seam, rather than reporting
+ * an empty Host: "no Sessions" and "cannot see Sessions" must stay distinct.
  */
 export async function listSessionRows(
   ctx: HostContext,
@@ -94,9 +134,14 @@ export async function listSessionRows(
   limit: number,
 ): Promise<SessionRow[]> {
   const controller = sessionControllerOf(ctx)
+  const query = sessionQueryOf(ctx)
+  const canList = callable(controller, 'list')
+  const canQuery = callable(query, 'listSessions')
+  if (!canList && !canQuery) throw new Error(noSessionListingReason(controller, query))
+
   const rows: SessionRow[] = []
-  if (controller !== undefined) {
-    const listed = await controller.list({})
+  if (canList) {
+    const listed = await (controller as NonNullable<typeof controller>).list({})
     for (const summary of listed.items) {
       rows.push({
         sessionId: summary.sessionId,
@@ -111,9 +156,7 @@ export async function listSessionRows(
       })
     }
   } else {
-    const query = sessionQueryOf(ctx)
-    if (query === undefined) return rows
-    for (const record of await query.listSessions()) {
+    for (const record of await (query as NonNullable<typeof query>).listSessions()) {
       rows.push({
         sessionId: record.header.id,
         ...(record.header.cwd === undefined ? {} : { cwd: record.header.cwd }),
@@ -181,10 +224,11 @@ export async function readTranscript(
   maxTurns: number,
 ): Promise<Transcript> {
   const query = sessionQueryOf(ctx)
-  if (query === undefined || typeof query.readSurface !== 'function') {
-    throw new Error('session bridge needs the session-query service to read another session')
+  if (!callable(query, 'readSurface')) {
+    throw new Error('session bridge cannot read another session: the session-query service is not mounted '
+      + 'with readSurface(); a Host providing sessionQuery.readSurface() is required')
   }
-  const snapshot = await query.readSurface(sessionId)
+  const snapshot = await (query as NonNullable<typeof query> & SurfaceReader).readSurface(sessionId)
   const turns: TranscriptTurn[] = []
   for (const event of snapshot.events) {
     if (event.type === 'user/message') {
@@ -226,9 +270,9 @@ async function findSummary(
   sessionId: string,
 ): Promise<{ readonly title?: string; readonly running: boolean; readonly cwd?: string } | undefined> {
   const controller = sessionControllerOf(ctx)
-  if (controller === undefined) return undefined
+  if (!callable(controller, 'list')) return undefined
   try {
-    const listed = await controller.list({})
+    const listed = await (controller as NonNullable<typeof controller>).list({})
     const summary = listed.items.find(item => item.sessionId === sessionId)
     if (summary === undefined) return undefined
     const title = summaryTitle(summary)
