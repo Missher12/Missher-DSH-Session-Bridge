@@ -12,9 +12,9 @@
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
 - [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
-## 安装固定版本
+## 安装与更新
 
-从 [v0.1.3-local.7 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.7) 下载 `missher-dsh-session-bridge-0.1.3-local.7.tgz` 和 `SHA256SUMS`。发行资产由维护者发布；若该 Release 尚未出现，这个版本仍是发行候选。不要将 GitHub 的自动源码压缩包当作插件 tarball。
+优先从[最新正式 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/latest)选择插件 `.tgz` 和 `SHA256SUMS`。当前正式包为 `missher-dsh-session-bridge-0.1.3-local.7.tgz`；下方固定地址用于复现本次交付，后续更新从 Latest 获取。GitHub 自动源码压缩包不是插件 tarball。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
@@ -69,7 +69,7 @@ dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Br
 
 ## Host 与平台边界
 
-没有宿主版本号硬限制，不代表所有版本都兼容。开发 SDK 基线为 rc.2；功能取决于 Host 服务与插槽是否存在。
+维护目标是支持合理的 DSH 版本范围并持续适配最新版；实际功能取决于 Host 服务和插槽，没有宿主版本号硬限制。开发 SDK 的 rc.2 是可复现构建基线，不是唯一可用版本。下表以已检查的能力差异说明功能可用条件，未测范围不声明全部通过。
 
 | 能力 | 官方 DSH 0.2.0-rc.2 | 带对应公共扩展的 Missher Desktop |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Br
 
 永久删除的运行中、其他写入者占用和派生子会话保护由 Host 执行。插件只调用公共删除接口，不推断或修改 Host 私有日志。未安装对应 Host 扩展时，升级插件不能补出该能力。
 
-验证层次见 `COMPATIBILITY.json`：local.5 的 macOS x64 rc.2 定制 Host 验收属于历史记录，包含浏览器复制及归档删除检查。本版在 Linux 隔离构建并验证顶部注册移除和侧栏复制；类型声明与运行包的来源单独记录。原生 Electron 点击、真实模型和各平台全功能验收不由离线测试替代。
+验证层次见 `COMPATIBILITY.json`：local.5 的 macOS x64 rc.2 定制 Host 验收属于历史记录，包含浏览器复制及归档删除检查。本版在 Linux 隔离构建并验证顶部注册移除和侧栏复制；当前 Ubuntu 配套桌面 `0.2.1-alpha.2.20261014.1` 已安装且 active，安装文件与公开包匹配。类型声明与运行包的来源单独记录。原生 Electron 点击、真实模型和各平台全功能验收不由离线测试替代。
 
 ## 配置
 

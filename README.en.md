@@ -12,9 +12,9 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 
-## Install a pinned version
+## Installation and updates
 
-Download `missher-dsh-session-bridge-0.1.3-local.7.tgz` and `SHA256SUMS` from [Release v0.1.3-local.7](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3-local.7). Release assets are published by the maintainer; until that tag appears, this version remains a release candidate. GitHub's automatic source archive is not the plugin tarball.
+Choose the plugin `.tgz` and `SHA256SUMS` from the [latest formal Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/latest). The current package is `missher-dsh-session-bridge-0.1.3-local.7.tgz`; the pinned URLs below reproduce this delivery. Use Latest for future updates. GitHub's automatic source archive is not the plugin tarball.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
@@ -69,7 +69,7 @@ Cleanup selects registered workspaces under the canonical `scratchRoot` whose di
 
 ## Host and platform boundaries
 
-There is no hard Host version gate. Admission does not prove compatibility: the required Host services and slots must exist. The development SDK baseline is rc.2.
+Maintenance targets a reasonable DSH version range and continued adaptation to the latest release. Features depend on Host services and slots; there is no hard version gate. The rc.2 development SDK is a reproducible build baseline, not the only intended compatible version. The table describes inspected capability differences, without claiming untested versions have passed.
 
 | Capability | Official DSH 0.2.0-rc.2 | Missher Desktop with the relevant public extension |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ There is no hard Host version gate. Admission does not prove compatibility: the 
 
 The Host enforces deletion guards for running sessions, other writers and derived child sessions. The plugin calls the public operation; it does not infer or edit private Host logs. Updating the plugin alone cannot add missing Host extensions.
 
-See `COMPATIBILITY.json` for evidence layers. The macOS x64 custom rc.2 checks for local.5 are historical, including browser copying and archived deletion. This release uses an isolated Linux build to verify removal of the header registration and retention of sidebar copying; declaration and runtime sources are recorded separately. Offline checks do not replace native Electron clicks, real-model calls or full cross-platform acceptance.
+See `COMPATIBILITY.json` for evidence layers. The macOS x64 custom rc.2 checks for local.5 are historical, including browser copying and archived deletion. This release uses an isolated Linux build to verify removal of the header registration and retention of sidebar copying. It is installed and active on the companion Ubuntu Desktop `0.2.1-alpha.2.20261014.1`, with installed files matching the public package. Declaration and runtime sources are recorded separately. Offline checks do not replace native Electron clicks, real-model calls or full cross-platform acceptance.
 
 ## Configuration
 
