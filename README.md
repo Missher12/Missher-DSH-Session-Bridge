@@ -4,31 +4,30 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**0.1.3**（发行候选，尚未发布或安装）。
+- 包名：`@missher/dsh-session-bridge`；版本：**0.1.3**（[正式 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3)；各设备需自行更新）。
 - 会话顶部单行显示完整会话 ID：窄窗口在 ID 区域内横向滚动，方向键与 Home/End 可用，点击即复制完整 ID；详情浮层由插件注入 `shell.overlay`，长路径正常换行。
 - 左侧三点菜单同样可复制完整 ID、工作目录或 `/bridge` 引用；归档记录带二次确认的删除入口。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
 - [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
-## 安装固定版本
+## 安装与更新
 
-0.1.3 是已冻结源码的**发行候选**：尚未发布、尚未安装，远端也还没有可用的 `v0.1.3` 资产地址。等维护者发布后，从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 下载 `missher-dsh-session-bridge-0.1.3.tgz` 与 `SHA256SUMS`，并以页面上的实际标签为准。不要将 GitHub 的自动源码压缩包当作插件 tarball。
+0.1.3 已提供[正式 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3)，下载 `missher-dsh-session-bridge-0.1.3.tgz` 与 `SHA256SUMS` 即可安装。后续版本从 [Latest Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/latest) 获取。下方固定地址用于复现本次交付，不是对 Host 版本的限制。不要将 GitHub 自动生成的源码压缩包当作插件 tarball。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
-发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.3.tgz`。
-在资产出现之前，请先用本地 tarball 的绝对路径安装。
+当前正式包固定地址：
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3/missher-dsh-session-bridge-0.1.3.tgz`。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.3.tgz
+dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3/missher-dsh-session-bridge-0.1.3.tgz
 ```
 
-发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
+也可把地址换成已下载 tarball 的绝对路径。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
 
 ## 使用
 

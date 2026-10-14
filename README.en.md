@@ -4,28 +4,27 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **0.1.3** (release candidate, not published or installed yet).
+- Package: `@missher/dsh-session-bridge`; version: **0.1.3** ([published release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3); each device must install the update separately).
 - The conversation header shows the complete session ID on one line: a narrow window scrolls the ID inside its own region, the arrow keys and Home/End work, and a click copies the whole ID. The detail panel is injected through the plugin's own `shell.overlay` cell, so long paths wrap instead of being clipped.
 - The sidebar menu also copies the full ID, the working directory and the session reference, and archived rows carry a confirmed delete entry.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 
-## Install a pinned version
+## Install and update
 
-0.1.3 is a **release candidate** with frozen source: it is not published, not installed, and no `v0.1.3` asset URL exists yet. Once the maintainer publishes it, download `missher-dsh-session-bridge-0.1.3.tgz` and `SHA256SUMS` from the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and trust that page's actual tag. GitHub's automatic source archive is not the plugin tarball.
+0.1.3 is a [published release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3). Download `missher-dsh-session-bridge-0.1.3.tgz` and `SHA256SUMS`; get future updates from [Latest Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/latest). The pinned URL below identifies this artifact, not a required Host version. GitHub's automatic source archive is not the plugin tarball.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
-The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.3.tgz`.
-Until that asset exists, install from a local tarball's absolute path.
+Pinned download URL:
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3/missher-dsh-session-bridge-0.1.3.tgz`. A downloaded tarball can also be installed by its absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.3.tgz
+dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v0.1.3/missher-dsh-session-bridge-0.1.3.tgz
 ```
 
 Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do not enable the old `dsh-session-bridge`, the `session-bridge-dev` alias and the scoped package together: they register the same tools, including `session_list`. Keep the previous package/configuration and let active work finish before reloading an upgrade.

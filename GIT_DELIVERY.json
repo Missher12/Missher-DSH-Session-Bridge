@@ -96,6 +96,13 @@
     "nativeElectron": "not tested this round",
     "realModelCalls": 0
   },
-  "published": false,
-  "installed": false
+  "published": true,
+  "release": {
+    "url": "https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3",
+    "id": 412582401,
+    "draft": false,
+    "prerelease": false
+  },
+  "installation": "Each device updates separately; publication does not certify installation.",
+  "sourceSnapshotScope": "sourceFiles records package-freeze source before publication-only README updates; runtime file hashes remain unchanged."
 }
