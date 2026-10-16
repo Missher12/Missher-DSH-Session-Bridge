@@ -6,7 +6,7 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 - Package: `@missher/dsh-session-bridge`; version: **0.1.3** ([published release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3); each device must install the update separately).
 - The conversation header shows the complete session ID on one line: a narrow window scrolls the ID inside its own region, the arrow keys and Home/End work, and a click copies the whole ID. The detail panel is injected through the plugin's own `shell.overlay` cell, so long paths wrap instead of being clipped.
-- The sidebar menu also copies the full ID, the working directory and the session reference, and archived rows carry a confirmed delete entry.
+- The sidebar menu also copies the full ID, the working directory and the session reference, and archived rows carry a confirmed delete entry when the Host provides the deletion capability.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 
@@ -77,6 +77,10 @@ Targets accept an exact ID, case-insensitive exact title or unique ID prefix. Am
 Cleanup selects registered workspaces under the canonical `scratchRoot` whose directory names start with `dsh-` and have no nonblank sessions, always excluding the fixed `dsh-scratch` workspace. It does not check a plugin-created marker or the current `scratchPrefix`: other matching `dsh-*` workspaces can qualify, while custom prefixes not starting with `dsh-` do not. Files saved in selected directories are also deleted. Review the preview and preserve anything you need first.
 
 ## Host and platform boundaries
+
+2026-10-17 increment: the **unchanged released 0.1.3 tarball** passed bounded Loader, session list/read, scratch reuse, missing-capability and unload checks against official npm DSH **0.2.1-alpha.5**. No runtime file was changed or repackaged. This official Host lacks `deleteArchivedSession` and `registerTrailingWorkspace`: archive deletion is unavailable and scratch keeps normal Host ordering.
+
+No alpha.5 browser or native Electron UI was tested in this increment; the earlier community-Host screenshots are not official-Host UI evidence. See the [official alpha.5 acceptance record](docs/compatibility/official-alpha5-20261017.md) for evidence layers and limits.
 
 There is no hard Host version gate: admission is capability-based, not version-based. The rc.2 development SDK pin is a development link only, not a compatibility gate.
 

@@ -6,7 +6,7 @@
 
 - 包名：`@missher/dsh-session-bridge`；版本：**0.1.3**（[正式 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.3)；各设备需自行更新）。
 - 会话顶部单行显示完整会话 ID：窄窗口在 ID 区域内横向滚动，方向键与 Home/End 可用，点击即复制完整 ID；详情浮层由插件注入 `shell.overlay`，长路径正常换行。
-- 左侧三点菜单同样可复制完整 ID、工作目录或 `/bridge` 引用；归档记录带二次确认的删除入口。
+- 左侧三点菜单同样可复制完整 ID、工作目录或 `/bridge` 引用；宿主提供归档删除接口时，归档记录显示二次确认删除入口。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
 - [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
@@ -79,6 +79,10 @@ dsh plugin --profile web add https://github.com/Missher12/Missher-DSH-Session-Br
 清理按规范化 `scratchRoot` 范围、目录名以 `dsh-` 开头、没有非空白会话筛选已注册工作区，始终排除固定 `dsh-scratch`。它不检查插件创建标记，也不使用当前 `scratchPrefix`：其他符合条件的 `dsh-*` 工作区也可能入选，自定义非 `dsh-` 前缀则不会入选。目录内自行保存的文件也会删除；先看预览，保留所需文件。
 
 ## Host 与平台边界
+
+2026-10-17 补充：已发布的 **0.1.3 原包**通过官方 npm DSH **0.2.1-alpha.5** 的有界 Loader、会话列举/读取、scratch 复用、缺能力降级与卸载检查，未改运行件或重包。官方版缺少 `deleteArchivedSession` 和 `registerTrailingWorkspace`：归档删除不可用，scratch 保留宿主普通排序。
+
+这次没有运行 alpha.5 的真实页面或原生 Electron 验收；此前社区版截图不是官方版 UI 证据。具体层次与限制见[官方 alpha.5 增量记录](docs/compatibility/official-alpha5-20261017.md)。
 
 没有宿主版本号硬限制：判定按能力，不按版本号。开发 SDK 的 rc.2 pin 只是开发链接，不是兼容范围门禁。
 

@@ -1,9 +1,9 @@
 {
   "package": "@missher/dsh-session-bridge",
   "packageVersion": "0.1.3",
-  "candidateStatus": "source candidate awaiting reviewer package freeze; not published or installed",
+  "candidateStatus": "formal Release v0.1.3 delivered; released runtime bytes remain frozen; later compatibility documentation is separate",
   "hardHostVersionGate": false,
-  "checkedOn": "2026-10-14",
+  "checkedOn": "2026-10-17",
   "buildAndTestPlatform": "Linux x64",
   "buildNodeVersion": "22.22.1",
   "releaseChecks": {
@@ -77,8 +77,8 @@
     "types": "declarations from the shared Host source SDK checkout; the packaged Host ships no .d.ts, so type verification is layered and does not claim packaged-declaration coverage"
   },
   "notAccepted": [
-    "unmodified official DSH builds",
-    "DSH versions and platforms other than the two listed distributions",
+    "official builds other than the bounded alpha.5 increment; official alpha.5 full UI/model behavior remains untested",
+    "DSH versions and platforms outside the listed community evidence and bounded official alpha.5 increment",
     "native Electron click behaviour",
     "real model calls",
     "Windows, macOS arm64, or Ubuntu full plugin behaviour"
@@ -100,5 +100,32 @@
       "evidence": "the four archive-deletion source files are unchanged since capture, so the real confirm/cancel/delete, workspace-file preservation and restart-persistence evidence is reused",
       "notClaimed": "the archive image does not show the whole bundle at the final candidate revision"
     }
+  },
+  "releaseChecksEvidenceDate": "2026-10-14",
+  "officialAlpha5Increment": {
+    "checkedOn": "2026-10-17",
+    "artifactSha256": "f722db704af3c5f64ec48452ccdf3d4d7ccade714ccf3fa1b75eb8128af033c3",
+    "runtime": "official npm @deepseek-ai/dsh@0.2.1-alpha.5",
+    "cordis": "4.0.5",
+    "upstreamReleaseCommit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa",
+    "runtimeLockSha256": "c7477a013763bb1360a7f845c09147604801301348ea5c391578fd805d60bf05",
+    "realHostLoader": "passed; one active Bridge instance, zero failed enabled entries",
+    "protocols": "actual ToolRuntime session_list/session_read/self-send refusal; authenticated scratch create/reuse; SSE client discovery and Host-wrapped frozen source",
+    "archiveDeletion": "unavailable; GET supported:false, forced POST 501 with synthetic history and workspace file preserved",
+    "scratchPlacement": "no registerTrailingWorkspace; normal ordering fallback; controlled client factory initialized without that method",
+    "unload": "passed; four tools absent, two HTTP routes 404, Bridge removed from boot graph",
+    "clientLifecycle": "official client module system and Cordis Loader, real frozen factory with controlled UI services; styles and dictionary removed on unload",
+    "notTested": [
+      "alpha5 browser layout and click behavior",
+      "alpha5 native Electron UI",
+      "successful cross-session delivery or real model/provider",
+      "shell/subprocess tool execution"
+    ],
+    "modelAttempts": 0,
+    "externalNetworkAttempts": 0,
+    "hostSubprocessProbe": "one Linux systemd scope capability probe blocked by the test guard; subprocess behavior not accepted",
+    "runtimeChanged": false,
+    "repackaged": false,
+    "details": "docs/compatibility/official-alpha5-20261017.md"
   }
 }
