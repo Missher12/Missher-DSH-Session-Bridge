@@ -6,6 +6,8 @@
 
 冻结安装包 `missher-dsh-session-bridge-0.1.4.tgz`，SHA-256 `37afff9a6a378b835b53cce0627fe627c1be975e0a6d0a70af98d61696884496`。源码交付与正式 Release 分开记录：下载资产是否已发布以 [Releases](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 为准；其他设备不会因 Git 推送自动更新。
 
+[本版正式 Release](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.4) 已公开，非草稿、非预发布；安装包与校验文件已匿名下载复核，摘要与本机安装候选一致。当前 Ubuntu 已安装并完成标题栏原生截图检查。
+
 ## 历史交付
 
 Session Bridge 0.1.3：完整会话 ID 与能力兼容

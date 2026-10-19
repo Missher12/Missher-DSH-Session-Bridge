@@ -34,7 +34,7 @@
     "lib/session-delete-wire.d.ts": "5fc8651e3f7eb3010ad8d5f014deb271c80a5a2f16274c4ff723ae497437f4e0",
     "lib/tools.d.ts": "971e05877377e77b14ce06b0e80e8e36784b1fac7659312dd8ed88ae3f64c7b4"
   },
-  "published": false,
+  "published": true,
   "validation": {
     "scope": "Header-only update; prior broader acceptance is retained as historical evidence below",
     "focusedTestsPassed": 59,
@@ -201,5 +201,14 @@
     "tsconfig.client.json": "c4e1723974781367a3374a1cba8e752c1bdc1a9c6ba720b0435b09e00d367f8e",
     "tsconfig.json": "59c3cc4c5cd22c5cf43bab1a9ee73961a81b7381ebfb8462d23cfa4e8da69c1e"
   },
-  "sourceSnapshotScope": "Current source export; runtime members exactly match frozen archive. Publication notes may differ from frozen package documents."
+  "sourceSnapshotScope": "Current source export; runtime members exactly match frozen archive. Publication notes may differ from frozen package documents.",
+  "release": {
+    "url": "https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v0.1.4",
+    "id": 417159211,
+    "tag": "v0.1.4",
+    "commit": "3d30109180c9a4a32e462a297c1917ef9a722158",
+    "draft": false,
+    "prerelease": false,
+    "anonymousDownloadsMatched": true
+  }
 }
