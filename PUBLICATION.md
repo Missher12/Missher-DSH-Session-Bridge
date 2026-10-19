@@ -1,4 +1,14 @@
-# Session Bridge 0.1.3：完整会话 ID 与能力兼容
+# Session Bridge 0.1.4：会话 ID 收入侧栏
+
+会话标题栏不再显示额外的 ID 控件。需要完整 ID 时，打开左侧对应会话的三点菜单，选择复制会话 ID；工作目录和引用入口继续保留。
+
+本次只移除顶部控件及专用浮层的注册，后端运行文件与 0.1.3 一致。严格类型、构建、59 项测试和官方 RC.2 隔离加载通过；Ubuntu 实际窗口已确认顶部 ID 消失。侧栏原生剪贴板点击与其他平台未在本轮重新验收。
+
+冻结安装包 `missher-dsh-session-bridge-0.1.4.tgz`，SHA-256 `37afff9a6a378b835b53cce0627fe627c1be975e0a6d0a70af98d61696884496`。源码交付与正式 Release 分开记录：下载资产是否已发布以 [Releases](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 为准；其他设备不会因 Git 推送自动更新。
+
+## 历史交付
+
+Session Bridge 0.1.3：完整会话 ID 与能力兼容
 
 本批已完成独立验收，Git 源码与 `lib/` 对应已发布的 `0.1.3` 安装包。会话顶部显示完整 ID，窄窗口仅滚动 ID 文字，复制与展开按钮保持可用；详情浮层避免标题栏裁切。README 新增四张使用合成数据的真实浏览器截图。
 

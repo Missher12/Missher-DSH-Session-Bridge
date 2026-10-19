@@ -4,8 +4,8 @@
  * esbuild only *transpiles* — it never runs the module. A missing JSX pragma, a
  * top-level DOM read, or a stray reference to an unimported binding therefore
  * survives the build and only dies in the browser, where DSH drops every one of
- * the plugin's registrations and the chip silently never appears. That failure
- * mode is too quiet to leave to a manual look at the header.
+ * the plugin's registrations and the sidebar actions silently never appear.
+ * That failure mode needs a check over the built artifact.
  *
  * This runs the real artifact through a stub `window.__ModuleLoader__.load`
  * with `react` and the JSX runtime stubbed, and asserts the factory returns a

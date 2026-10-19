@@ -1,131 +1,155 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.3",
-  "candidateStatus": "formal Release v0.1.3 delivered; released runtime bytes remain frozen; later compatibility documentation is separate",
+  "packageVersion": "0.1.4",
+  "candidateStatus": "offline checks passed; integrated Host and native verification pending",
   "hardHostVersionGate": false,
-  "checkedOn": "2026-10-17",
-  "buildAndTestPlatform": "Linux x64",
-  "buildNodeVersion": "22.22.1",
-  "releaseChecks": {
+  "change": "Session identity actions remain in the left sidebar menu; redundant header ID and its overlay are no longer registered.",
+  "currentChecks": {
     "hostAndClientTypes": "passed",
     "isolatedBuild": "passed",
+    "clientModuleLoad": "passed with static module stubs",
     "offlineTests": {
       "passed": 59,
       "failed": 0,
       "skipped": 0,
       "concurrency": 1
     },
-    "clientModuleLoad": "passed with Host static module stubs and with both real community Host client Loaders",
-    "hostContracts": "passed against shared Host source SDK declarations; not packaged .d.ts",
-    "chipPanelBehaviourTests": "12 React and JSDOM tests over controlled geometry inputs; these are behavioural checks, not pixel or browser layout evidence",
-    "styleOwnership": "passed on the installed alpha.2 module system with the real Cordis Loader: peer reload, self reload and unload, single owned sheet, peer sheet preserved",
-    "archiveDeletion": "passed on Missher rc.2 with real browser clicks; synthetic records only",
-    "nativeElectronClicks": "not run",
-    "realModelCalls": "not run"
+    "sidebarCopy": "existing selected-row ID/cwd/bridge tests passed",
+    "headerRegistration": "no header ID or identity overlay; sidebar copy and notice remain",
+    "nativeElectron": "pending",
+    "realModelCalls": 0,
+    "commandNote": "pnpm run check aborted at dependency auto-install before checks; same commands then passed using existing compiler directly, without dependency installation."
   },
-  "hostMatrix": {
-    "note": "Two actual Missher community distributions, both modified for this desktop product. Neither is an unmodified official build. No host version number acts as a gate; every row is capability-based.",
-    "hosts": [
+  "historicalEvidence": {
+    "package": "@missher/dsh-session-bridge",
+    "packageVersion": "0.1.3",
+    "candidateStatus": "formal Release v0.1.3 delivered; released runtime bytes remain frozen; later compatibility documentation is separate",
+    "hardHostVersionGate": false,
+    "checkedOn": "2026-10-17",
+    "buildAndTestPlatform": "Linux x64",
+    "buildNodeVersion": "22.22.1",
+    "releaseChecks": {
+      "hostAndClientTypes": "passed",
+      "isolatedBuild": "passed",
+      "offlineTests": {
+        "passed": 59,
+        "failed": 0,
+        "skipped": 0,
+        "concurrency": 1
+      },
+      "clientModuleLoad": "passed with Host static module stubs and with both real community Host client Loaders",
+      "hostContracts": "passed against shared Host source SDK declarations; not packaged .d.ts",
+      "chipPanelBehaviourTests": "12 React and JSDOM tests over controlled geometry inputs; these are behavioural checks, not pixel or browser layout evidence",
+      "styleOwnership": "passed on the installed alpha.2 module system with the real Cordis Loader: peer reload, self reload and unload, single owned sheet, peer sheet preserved",
+      "archiveDeletion": "passed on Missher rc.2 with real browser clicks; synthetic records only",
+      "nativeElectronClicks": "not run",
+      "realModelCalls": "not run"
+    },
+    "hostMatrix": {
+      "note": "Two actual Missher community distributions, both modified for this desktop product. Neither is an unmodified official build. No host version number acts as a gate; every row is capability-based.",
+      "hosts": [
+        {
+          "distribution": "Missher community desktop, DSH 0.2.0-rc.2, Cordis 4.0.4",
+          "realLoaderAndHttp": "passed",
+          "clientBootGraph": "passed",
+          "bridgeActivations": 1,
+          "failedEnabledComponents": 0,
+          "uiWidths": [
+            "1280x800",
+            "600x800 with sidebar expanded"
+          ]
+        },
+        {
+          "distribution": "Missher community desktop, DSH 0.2.1-alpha.2, Cordis 4.0.5-alpha.1, desktop 0.2.1-alpha.2.20261014.1",
+          "realLoaderAndHttp": "passed",
+          "clientBootGraph": "passed",
+          "bridgeActivations": 1,
+          "failedEnabledComponents": 0,
+          "uiWidths": [
+            "1280x800",
+            "600x800 with sidebar expanded"
+          ]
+        }
+      ],
+      "uiChecks": "single-line complete id, full-id copy, Home/End scrolling in the id region, detail panel and Escape, and natural width restored after growing the window; 0 console errors, 0 model requests, 0 external fetches"
+    },
+    "optionalHostExtensions": [
       {
-        "distribution": "Missher community desktop, DSH 0.2.0-rc.2, Cordis 4.0.4",
-        "realLoaderAndHttp": "passed",
-        "clientBootGraph": "passed",
-        "bridgeActivations": 1,
-        "failedEnabledComponents": 0,
-        "uiWidths": [
-          "1280x800",
-          "600x800 with sidebar expanded"
-        ]
+        "capability": "sessionController.deleteArchivedSession",
+        "purpose": "permanent deletion of archived chat history",
+        "fallback": "the delete entry is hidden; an unsupported request answers POST 501 without reading private storage",
+        "coverage": "rc.2 real clicks for confirm, cancel and delete over synthetic records; the missing-capability branch is covered by a controlled fixture"
       },
       {
-        "distribution": "Missher community desktop, DSH 0.2.1-alpha.2, Cordis 4.0.5-alpha.1, desktop 0.2.1-alpha.2.20261014.1",
-        "realLoaderAndHttp": "passed",
-        "clientBootGraph": "passed",
-        "bridgeActivations": 1,
-        "failedEnabledComponents": 0,
-        "uiWidths": [
-          "1280x800",
-          "600x800 with sidebar expanded"
-        ]
+        "capability": "uiWorkspace.registerTrailingWorkspace",
+        "purpose": "place the scratch group after ordinary workspaces in the sidebar",
+        "fallback": "ordinary Host sidebar order",
+        "coverage": "fixture"
       }
     ],
-    "uiChecks": "single-line complete id, full-id copy, Home/End scrolling in the id region, detail panel and Escape, and natural width restored after growing the window; 0 console errors, 0 model requests, 0 external fetches"
-  },
-  "optionalHostExtensions": [
-    {
-      "capability": "sessionController.deleteArchivedSession",
-      "purpose": "permanent deletion of archived chat history",
-      "fallback": "the delete entry is hidden; an unsupported request answers POST 501 without reading private storage",
-      "coverage": "rc.2 real clicks for confirm, cancel and delete over synthetic records; the missing-capability branch is covered by a controlled fixture"
+    "hostOwnedFeature": "the dedicated workspace archive toolbar icon belongs to the Host and is not shipped by this plugin",
+    "deletionSemantics": "confirming deletes archived chat history only; files in the workspace and other sessions are preserved, and the deletion persists across a restart",
+    "runtimeSurface": {
+      "hostHalf": "no @deepseek-ai/dsh-* runtime import; every Host capability is reached through the Cordis context",
+      "clientHalf": "exactly three static requests: react, react/jsx-runtime, and @deepseek-ai/dsh-client-ui-primitives",
+      "noHostChanges": "no Host patch, row rename, HMR shim or package-manager bypass"
     },
-    {
-      "capability": "uiWorkspace.registerTrailingWorkspace",
-      "purpose": "place the scratch group after ordinary workspaces in the sidebar",
-      "fallback": "ordinary Host sidebar order",
-      "coverage": "fixture"
-    }
-  ],
-  "hostOwnedFeature": "the dedicated workspace archive toolbar icon belongs to the Host and is not shipped by this plugin",
-  "deletionSemantics": "confirming deletes archived chat history only; files in the workspace and other sessions are preserved, and the deletion persists across a restart",
-  "runtimeSurface": {
-    "hostHalf": "no @deepseek-ai/dsh-* runtime import; every Host capability is reached through the Cordis context",
-    "clientHalf": "exactly three static requests: react, react/jsx-runtime, and @deepseek-ai/dsh-client-ui-primitives",
-    "noHostChanges": "no Host patch, row rename, HMR shim or package-manager bypass"
-  },
-  "developmentSdk": {
-    "pin": "0.2.0-rc.2 link for development only; not a compatibility gate",
-    "types": "declarations from the shared Host source SDK checkout; the packaged Host ships no .d.ts, so type verification is layered and does not claim packaged-declaration coverage"
-  },
-  "notAccepted": [
-    "official builds other than the bounded alpha.5 increment; official alpha.5 full UI/model behavior remains untested",
-    "DSH versions and platforms outside the listed community evidence and bounded official alpha.5 increment",
-    "native Electron click behaviour",
-    "real model calls",
-    "Windows, macOS arm64, or Ubuntu full plugin behaviour"
-  ],
-  "screenshots": {
-    "note": "All four are real IAB browser clicks over synthetic sessions in an isolated directory, not native Electron.",
-    "finalRuntimeBytes": {
-      "images": [
-        "docs/images/header-full-alpha2.png",
-        "docs/images/header-narrow-alpha2.png",
-        "docs/images/scratch-workspace-alpha2.png"
-      ],
-      "captureManifest": "0.1.3-local.7 diagnostic manifest",
-      "finalClientBundleSha256": "04aee89f50915de92811b209bfe15f56b8568b231a7ac2f1da860dfd2fdfdcda"
+    "developmentSdk": {
+      "pin": "0.2.0-rc.2 link for development only; not a compatibility gate",
+      "types": "declarations from the shared Host source SDK checkout; the packaged Host ships no .d.ts, so type verification is layered and does not claim packaged-declaration coverage"
     },
-    "archiveDeletion": {
-      "image": "docs/images/archive-confirm-rc2.png",
-      "fromEarlierBuild": true,
-      "evidence": "the four archive-deletion source files are unchanged since capture, so the real confirm/cancel/delete, workspace-file preservation and restart-persistence evidence is reused",
-      "notClaimed": "the archive image does not show the whole bundle at the final candidate revision"
-    }
-  },
-  "releaseChecksEvidenceDate": "2026-10-14",
-  "officialAlpha5Increment": {
-    "checkedOn": "2026-10-17",
-    "artifactSha256": "f722db704af3c5f64ec48452ccdf3d4d7ccade714ccf3fa1b75eb8128af033c3",
-    "runtime": "official npm @deepseek-ai/dsh@0.2.1-alpha.5",
-    "cordis": "4.0.5",
-    "upstreamReleaseCommit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa",
-    "runtimeLockSha256": "c7477a013763bb1360a7f845c09147604801301348ea5c391578fd805d60bf05",
-    "realHostLoader": "passed; one active Bridge instance, zero failed enabled entries",
-    "protocols": "actual ToolRuntime session_list/session_read/self-send refusal; authenticated scratch create/reuse; SSE client discovery and Host-wrapped frozen source",
-    "archiveDeletion": "unavailable; GET supported:false, forced POST 501 with synthetic history and workspace file preserved",
-    "scratchPlacement": "no registerTrailingWorkspace; normal ordering fallback; controlled client factory initialized without that method",
-    "unload": "passed; four tools absent, two HTTP routes 404, Bridge removed from boot graph",
-    "clientLifecycle": "official client module system and Cordis Loader, real frozen factory with controlled UI services; styles and dictionary removed on unload",
-    "notTested": [
-      "alpha5 browser layout and click behavior",
-      "alpha5 native Electron UI",
-      "successful cross-session delivery or real model/provider",
-      "shell/subprocess tool execution"
+    "notAccepted": [
+      "official builds other than the bounded alpha.5 increment; official alpha.5 full UI/model behavior remains untested",
+      "DSH versions and platforms outside the listed community evidence and bounded official alpha.5 increment",
+      "native Electron click behaviour",
+      "real model calls",
+      "Windows, macOS arm64, or Ubuntu full plugin behaviour"
     ],
-    "modelAttempts": 0,
-    "externalNetworkAttempts": 0,
-    "hostSubprocessProbe": "one Linux systemd scope capability probe blocked by the test guard; subprocess behavior not accepted",
-    "runtimeChanged": false,
-    "repackaged": false,
-    "details": "docs/compatibility/official-alpha5-20261017.md"
-  }
+    "screenshots": {
+      "note": "All four are real IAB browser clicks over synthetic sessions in an isolated directory, not native Electron.",
+      "finalRuntimeBytes": {
+        "images": [
+          "docs/images/header-full-alpha2.png",
+          "docs/images/header-narrow-alpha2.png",
+          "docs/images/scratch-workspace-alpha2.png"
+        ],
+        "captureManifest": "0.1.3-local.7 diagnostic manifest",
+        "finalClientBundleSha256": "04aee89f50915de92811b209bfe15f56b8568b231a7ac2f1da860dfd2fdfdcda"
+      },
+      "archiveDeletion": {
+        "image": "docs/images/archive-confirm-rc2.png",
+        "fromEarlierBuild": true,
+        "evidence": "the four archive-deletion source files are unchanged since capture, so the real confirm/cancel/delete, workspace-file preservation and restart-persistence evidence is reused",
+        "notClaimed": "the archive image does not show the whole bundle at the final candidate revision"
+      }
+    },
+    "releaseChecksEvidenceDate": "2026-10-14",
+    "officialAlpha5Increment": {
+      "checkedOn": "2026-10-17",
+      "artifactSha256": "f722db704af3c5f64ec48452ccdf3d4d7ccade714ccf3fa1b75eb8128af033c3",
+      "runtime": "official npm @deepseek-ai/dsh@0.2.1-alpha.5",
+      "cordis": "4.0.5",
+      "upstreamReleaseCommit": "1517a4dbca0a2789ff1d41ba439600f8547d23fa",
+      "runtimeLockSha256": "c7477a013763bb1360a7f845c09147604801301348ea5c391578fd805d60bf05",
+      "realHostLoader": "passed; one active Bridge instance, zero failed enabled entries",
+      "protocols": "actual ToolRuntime session_list/session_read/self-send refusal; authenticated scratch create/reuse; SSE client discovery and Host-wrapped frozen source",
+      "archiveDeletion": "unavailable; GET supported:false, forced POST 501 with synthetic history and workspace file preserved",
+      "scratchPlacement": "no registerTrailingWorkspace; normal ordering fallback; controlled client factory initialized without that method",
+      "unload": "passed; four tools absent, two HTTP routes 404, Bridge removed from boot graph",
+      "clientLifecycle": "official client module system and Cordis Loader, real frozen factory with controlled UI services; styles and dictionary removed on unload",
+      "notTested": [
+        "alpha5 browser layout and click behavior",
+        "alpha5 native Electron UI",
+        "successful cross-session delivery or real model/provider",
+        "shell/subprocess tool execution"
+      ],
+      "modelAttempts": 0,
+      "externalNetworkAttempts": 0,
+      "hostSubprocessProbe": "one Linux systemd scope capability probe blocked by the test guard; subprocess behavior not accepted",
+      "runtimeChanged": false,
+      "repackaged": false,
+      "details": "docs/compatibility/official-alpha5-20261017.md"
+    }
+  },
+  "checkedOn": "2026-10-19"
 }

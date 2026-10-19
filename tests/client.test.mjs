@@ -77,7 +77,7 @@ it('copies the chosen sidebar row ID, cwd and bridge reference without opening t
   actions.dispose()
 })
 
-it('registers exactly one conversation-header identity control and keeps sidebar copying', () => {
+it('keeps identity actions in the sidebar without a header control or identity overlay', () => {
   const registrations = []
   client.apply({
     effect() {},
@@ -90,14 +90,8 @@ it('registers exactly one conversation-header identity control and keeps sidebar
       register(options, component) { registrations.push({ ...options, component }); return () => {} },
     },
   })
-  // The header control is back by explicit user request: the id must be
-  // readable as a whole where the session title is, not only behind a menu.
-  const headers = registrations.filter(entry => entry.name === 'conversation.session.header.actions')
-  assert.equal(headers.length, 1, 'exactly one header cell is registered, never a duplicate')
-  assert.equal(headers[0].id, 'session-identity')
-  assert.equal(headers[0].order, 0, 'the chip sits between the preset label (-10) and the job counter (20)')
-  assert.equal(headers[0].locale, 'sessionBridge', 'the cell reads its strings from the registered namespace')
-  assert.equal(typeof headers[0].component, 'function', 'the registered cell renders the shipped chip component')
+  assert.equal(registrations.filter(entry => entry.name === 'conversation.session.header.actions').length, 0)
+  assert.equal(registrations.filter(entry => entry.id === 'session-bridge-identity-panel').length, 0)
   const copies = registrations.filter(entry => entry.name === 'sidebar.workspaces.session.menu.item'
     && entry.id.startsWith('dsh-session-bridge.copy-'))
   assert.deepEqual(copies.map(entry => entry.id), [

@@ -1,6 +1,5 @@
-/** Browser half: the session ID control and the shared scratch workspace picker. */
+/** Browser half: sidebar session actions and the shared scratch workspace picker. */
 
-import { ChipPanelOverlay, createChipPanelActions, SessionIdChip } from './SessionIdChip.js'
 import { ScratchWorkspacePicker } from './ScratchWorkspacePicker.js'
 import type { ScratchPickerInjected } from './ScratchWorkspacePicker.js'
 import { en, NS, zh } from './locales.js'
@@ -24,20 +23,6 @@ export { ScratchWorkspacePicker } from './ScratchWorkspacePicker.js'
 export type { ScratchWorkspacePickerProps, ScratchPickerInjected } from './ScratchWorkspacePicker.js'
 
 /**
- * The overlay cell the identity panel renders into.
- *
- * The panel cannot live inside the header: the action band sits under an
- * ancestor with `overflow: hidden`, so an absolutely positioned panel is
- * clipped there no matter how it is anchored. `shell.overlay` is the Host's own
- * root-scope layer above the frame, which is where a panel that must not be
- * clipped belongs.
- */
-const OVERLAY_SLOT = 'shell.overlay'
-
-/** This overlay entry's cell id. */
-const OVERLAY_ID = 'session-bridge-identity-panel'
-
-/**
  * Required client services.
  *
  * `slots` is the registry this half contributes to, `locale` owns the
@@ -45,30 +30,6 @@ const OVERLAY_ID = 'session-bridge-identity-panel'
  * native chooser the New-Session row uses. `workspaces` adopts the returned registry record.
  */
 export const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions']
-
-/**
- * The slot this half occupies: the session header's title-adjacent action band.
- *
- * This band is where a person looks for facts about *this* conversation, and
- * the id is the one fact the bridge's cross-session tools need. The control
- * shows the complete id on one line, and scrolls its text region sideways when
- * the band is too narrow rather than shortening the id; the dsh-sbc- rules
- * below carry the layout, and SessionIdChip renders it.
- */
-const SLOT = 'conversation.session.header.actions'
-
-/** This entry's cell id inside that band. */
-const ENTRY_ID = 'session-identity'
-
-/**
- * Where the chip sits among its neighbours.
- *
- * The band currently holds the subagent lineage (-30), the agent-preset label
- * (-10), and the background-job counter (20). Session identity belongs with the
- * other facts about *this* session, so it lands between the preset label and
- * the job counter rather than at the far edge.
- */
-const ENTRY_ORDER = 0
 
 /** The blank-session picker cell this half replaces, to add the scratch row. */
 const HERO_PICKER_SLOT = 'conversation.hero.workspace'
@@ -289,8 +250,8 @@ function installStyles(): () => void {
 }
 
 /**
- * Client plugin body: register the dictionaries, the header chip, the sidebar
- * actions, and the extra New-Session row.
+ * Client plugin body: register the dictionaries, sidebar session actions,
+ * and the extra New-Session row.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContextLike): void {
@@ -301,27 +262,10 @@ export function apply(ctx: ClientContextLike): void {
   }
   const copyActions = createSessionCopyActions(ctx.sessions)
   const deleteActions = createSessionDeleteActions(ctx.workspaces.list)
-  const chip = createChipPanelActions()
   ctx.effect(() => () => { deleteActions.dispose() }, 'session-bridge: deletion confirmation')
   ctx.effect(() => () => { copyActions.dispose() }, 'session-bridge: sidebar actions')
-  ctx.effect(() => () => { chip.dispose() }, 'session-bridge: identity panel')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'session-bridge: dictionaries')
   ctx.effect(installStyles, 'session-bridge: styles')
-  ctx.slots.inject(SLOT, () => ctx.slots.register({
-    name: SLOT,
-    id: ENTRY_ID,
-    order: ENTRY_ORDER,
-    locale: NS,
-    inject: (): { chip: typeof chip } => ({ chip }),
-  }, SessionIdChip))
-  // The panel is a sibling cell in the overlay layer, not a child of the chip:
-  // the header clips its overflow, so a panel rendered there would be cut off.
-  ctx.slots.inject(OVERLAY_SLOT, () => ctx.slots.register({
-    name: OVERLAY_SLOT,
-    id: OVERLAY_ID,
-    locale: NS,
-    inject: (): { chip: typeof chip } => ({ chip }),
-  }, ChipPanelOverlay))
   // Replaces the blank-session picker so its menu can carry the one row DSH
   // has no seam for. See ScratchWorkspacePicker's module doc for why this is a
   // replacement rather than a contribution.
