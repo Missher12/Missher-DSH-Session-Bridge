@@ -1,6 +1,6 @@
 {
   "name": "@missher/dsh-session-bridge",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Session IDs, cross-session messaging, and scratch workspaces for DeepSeek Harness.",
   "keywords": [
@@ -37,7 +37,8 @@
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "COMPATIBILITY.json",
-    "docs/images"
+    "docs/images",
+    "docs/compatibility/official-rc4-0.1.5.md"
   ],
   "scripts": {
     "build": "pnpm run build:host && pnpm run build:client",

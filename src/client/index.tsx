@@ -13,7 +13,7 @@ import type { ArchiveSource } from './session-delete.js'
 import { trackScratchPlacement } from './scratch-placement.js'
 import type { WorkspacePlacementSource } from './scratch-placement.js'
 
-export { createSessionDeleteActions } from './session-delete.js'
+export { createSessionDeleteActions, readSessionDeleteCapability } from './session-delete.js'
 export { createSessionCopyActions } from './session-menu.js'
 
 export { copyPayload, shortenSessionId, writeClipboard } from './clipboard.js'
@@ -57,6 +57,11 @@ const STYLE_ID = 'dsh-session-bridge-styles'
  * `dsh-sbc-` to keep them out of the app's own namespace.
  */
 const STYLES = `
+.dsh-sb-deleteHint {
+  box-sizing: border-box; max-inline-size: min(280px, 100%); padding: 4px 12px 8px;
+  color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.5;
+  white-space: normal; overflow-wrap: anywhere;
+}
 /*
  * One line, never shortened, always reachable.
  *
@@ -256,7 +261,8 @@ function installStyles(): () => void {
  */
 export function apply(ctx: ClientContextLike): void {
   const picker = scratchPickerInjected(ctx)
-  const registerTrailing = ctx.uiWorkspace.registerTrailingWorkspace?.bind(ctx.uiWorkspace)
+  const registerTrailing = typeof ctx.uiWorkspace.registerTrailingWorkspace === 'function'
+    ? ctx.uiWorkspace.registerTrailingWorkspace.bind(ctx.uiWorkspace) : undefined
   if (registerTrailing !== undefined) {
     ctx.effect(() => trackScratchPlacement(ctx.workspaces.list, picker.findScratchWorkspace, registerTrailing), 'session-bridge: trailing workspace placement')
   }

@@ -4,7 +4,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**0.1.4**（顶部 ID 已移至侧栏菜单）。
+- 包名：`@missher/dsh-session-bridge`；版本：**0.1.5**（顶部 ID 已移至侧栏菜单）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；归档记录带二次确认的删除入口。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -12,20 +12,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 0.1.4，下载 `missher-dsh-session-bridge-0.1.4.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 0.1.5，下载 `missher-dsh-session-bridge-0.1.5.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.4.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.5.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.5.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -36,7 +36,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.
 
 在左侧找到目标会话，点击该行的三点菜单，选择“复制会话 ID”。复制结果保留完整 `session-` 前缀；菜单也能复制工作目录或 `/bridge <session-id> ` 引用。顶部只保留会话标题和其他操作，不再显示重复的 ID 控件或详情浮层。
 
-操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。归档记录另外提供带二次确认的“删除会话…”入口，是否可用取决于宿主的删除接口。
+操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。归档记录始终显示“删除会话…”入口。支持安全删除接口时，点击后再确认；不支持时禁用并显示原因。查询中、查询失败和宿主不支持会分别说明，重新打开菜单即可重查。若确认时宿主返回 501，弹窗明确说明不支持并禁止重复提交。
 
 ### 「不在工作区」与 scratch
 
@@ -73,6 +73,10 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.
 
 ## Host 与平台边界
 
+0.1.5 已核对官方 npm **DSH 0.2.1-rc.4** 的公开声明和实现：没有满足写入锁、并发派生会话与日志/索引一致性要求的永久删除接口，插件因此明确降级，不自行删除私有文件。官方有 `workspaces.insertBefore`，但它修改持久化排序，不是可释放的侧栏置底钩子；本插件保留宿主顺序，用户仍可用宿主拖拽排序。新会话选择器中的临时项仍在末尾。详见[接口调查与风险报告](docs/compatibility/official-rc4-0.1.5.md)。当前验证状态见 `COMPATIBILITY.json`；接口审计不等于官方宿主安装或 Electron 验收。
+
+0.1.5 的客户端类型、后端/客户端构建、模块加载、61 项离线测试及真实 React/JSDOM 交互均通过。浏览器合成夹具实点验证了缺能力、查询失败、确认返回 501、取消与合成成功；没有运行官方 rc.4 完整 Host 或 Electron。浏览器工具的虚拟剪贴板未能完成回读，完整复制字节仅在组件测试中验证。
+
 0.1.4 移除顶部 ID 后，Host/client 类型检查、隔离构建、模块加载与 59 项离线测试全部通过（0 失败、0 跳过）。完整 ID、目录和引用的侧栏复制测试保持通过。下方 0.1.3 实测记录作为历史基线保留。
 
 2026-10-17 补充：已发布的 **0.1.3 原包**通过官方 npm DSH **0.2.1-alpha.5** 的有界 Loader、会话列举/读取、scratch 复用、缺能力降级与卸载检查，未改运行件或重包。官方版缺少 `deleteArchivedSession` 和 `registerTrailingWorkspace`：归档删除不可用，scratch 保留宿主普通排序。
@@ -81,7 +85,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.
 
 没有宿主版本号硬限制：判定按能力，不按版本号。开发 SDK 的 rc.2 pin 只是开发链接，不是兼容范围门禁。
 
-以下为 0.1.3 的历史验证记录，不代表 0.1.4 已完成相同验收。2026-10-14 在 Linux x64 / Node 22.22.1 上实测两套 **Missher 社区发行版**（都是为该桌面产品改过的构建，不是未经改动的官方版）：
+以下为 0.1.3 的历史验证记录，不代表 0.1.5 已完成相同验收。2026-10-14 在 Linux x64 / Node 22.22.1 上实测两套 **Missher 社区发行版**（都是为该桌面产品改过的构建，不是未经改动的官方版）：
 
 | | DSH 0.2.0-rc.2 / Cordis 4.0.4 | DSH 0.2.1-alpha.2 / Cordis 4.0.5-alpha.1（desktop 0.2.1-alpha.2.20261014.1） |
 | --- | --- | --- |
@@ -95,7 +99,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.
 | --- | --- | --- |
 | ID 显示与复制、跨会话工具、scratch、选择器末尾入口 | 插件提供 | 插件提供 |
 | 将“不在工作区”组排在侧栏其他工作区之后 | 保留普通排序 | 使用 `uiWorkspace.registerTrailingWorkspace`；不改持久排序 |
-| 永久删除归档聊天记录 | 隐藏该入口；请求返回 POST 501，且不读取私有存储 | 归档行“删除会话…”二次确认；仅删聊天记录，工作区文件保留 |
+| 永久删除归档聊天记录 | 显示禁用入口及原因；请求返回 POST 501，且不读取私有存储 | 归档行“删除会话…”二次确认；仅删聊天记录，工作区文件保留 |
 | 工作区标题栏的专用归档图标 | 属于 Host，不由本插件包提供 | 同左 |
 
 归档记录的二次确认（Missher 社区发行版 DSH 0.2.0-rc.2，仅合成记录）：
@@ -105,9 +109,11 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.
 
 保留的 scratch 和归档确认图为 0.1.3 历史证据，来自隔离目录中的合成会话，不是原生 Electron。顶部 ID 已在 0.1.4 移除，旧顶部截图不再作为当前界面展示。
 
+删除不可撤销。需要保留记录时，应先正常退出所有使用该数据目录的进程，备份完整 profile 与其实际配置的持久化存储；恢复时也先正常退出，并整体恢复同一份快照，不能只补回单个日志文件。
+
 删除能力依赖可选的 `sessionController.deleteArchivedSession`：缺失时插件不补私有删除路径，也不读取 Host 私有日志。运行中、被其他写入者占用或存在派生子会话时的保护由 Host 执行。
 
-验证层次见 `COMPATIBILITY.json`。0.1.3在 Linux 隔离构建，59 条离线测试全通过（0 失败 0 跳过，worker 1）；其中 12 条 chip/浮层测试是 React + JSDOM 的受控几何行为检查，不等于像素或浏览器布局证据。`check-host-contracts` 通过的是共享 Host **source SDK 声明**，安装包内没有 `.d.ts`。样式所有权与 peer reload/self reload/unload 在真实安装的 alpha.2 模块系统 + Cordis Loader 上通过；历史上“无主 style 被 claim”的负对照在新版不再复现（owner 为 null），旧故障复现说法不适用于本版。归档删除的确认/取消/删除为 rc.2 真实点击、仅合成记录，工作区文件与其他会话保留、重启后删除仍持久。原生 Electron 点击、真实模型调用、其他官方版本与其他平台未验收。
+验证层次见 `COMPATIBILITY.json`。0.1.3在 Linux 隔离构建，59 条离线测试全通过（0 失败 0 跳过，worker 1）；其中 12 条 chip/浮层测试是 React + JSDOM 的受控几何行为检查，不等于像素或浏览器布局证据。`check-host-contracts` 通过的是共享 Host **source SDK 声明**，当时核查的社区安装包未提供对应 `.d.ts`；官方 rc.4 npm 包已有声明。样式所有权与 peer reload/self reload/unload 在真实安装的 alpha.2 模块系统 + Cordis Loader 上通过；历史上“无主 style 被 claim”的负对照在新版不再复现（owner 为 null），旧故障复现说法不适用于本版。归档删除的确认/取消/删除为 rc.2 真实点击、仅合成记录，工作区文件与其他会话保留、重启后删除仍持久。原生 Electron 点击、真实模型调用、其他官方版本与其他平台未验收。
 
 ## 配置
 
@@ -160,7 +166,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.4.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.5.tgz
 ```
 
 SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。

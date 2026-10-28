@@ -25,7 +25,7 @@ it('routes through the Host owner and reports unsupported Hosts without touching
   }
   registerSessionDeleteRoute(ctx)
   const capability = () => route.fetch(new Request('http://localhost' + route.path)).then(response => response.json())
-  assert.deepEqual(await capability(), { supported: false })
+  assert.deepEqual(await capability(), { supported: false, reason: 'session/delete-unsupported' })
   const send = value => route.fetch(new Request('http://localhost' + route.path, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value),
   }))
@@ -33,14 +33,22 @@ it('routes through the Host owner and reports unsupported Hosts without touching
   const unsupported = await send({ sessionId: 'one', confirmed: true })
   assert.equal(unsupported.status, 501)
   assert.equal((await unsupported.json()).error.code, 'session/delete-unsupported')
+  controller.deleteArchivedSession = true
+  assert.deepEqual(await capability(), { supported: false, reason: 'session/delete-unsupported' })
+  assert.equal((await send({ sessionId: 'one', confirmed: true })).status, 501,
+    'a non-callable property must not be advertised or attempted as a deletion API')
   const deleted = []
   controller.deleteArchivedSession = async id => { deleted.push(id) }
   assert.deepEqual(await capability(), { supported: true })
   assert.deepEqual(deleted, [], 'capability lookup must never delete a session')
   assert.equal((await (await send({ sessionId: 'one', confirmed: true })).json()).ok, true)
   assert.deepEqual(deleted, ['one'])
-  controller.deleteArchivedSession = async () => { throw new Error('session/delete-active') }
-  assert.equal((await (await send({ sessionId: 'one', confirmed: true })).json()).error.code, 'session/delete-active')
+  for (const code of ['session/delete-active', 'session/delete-owned', 'session/delete-has-children', 'session/delete-not-archived']) {
+    controller.deleteArchivedSession = async () => { throw new Error(code) }
+    const response = await send({ sessionId: 'one', confirmed: true })
+    assert.equal(response.status, 409)
+    assert.equal((await response.json()).error.code, code, 'Host safety refusals must survive the route')
+  }
   for (const cleanup of cleanups) await cleanup()
   assert.equal(unregistered, true)
   assert.equal((await send({ sessionId: 'one', confirmed: true })).status, 409)

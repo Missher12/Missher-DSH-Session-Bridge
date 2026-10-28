@@ -16,6 +16,20 @@ interface DeleteState {
   readonly error?: SessionBridgeKey
 }
 
+/** A failed probe is not evidence that the Host lacks the capability. */
+export type SessionDeleteCapability = 'supported' | 'unsupported' | 'error'
+
+export async function readSessionDeleteCapability(signal: AbortSignal, send = fetch): Promise<SessionDeleteCapability> {
+  const response = await send(SESSION_DELETE_PATH.slice(1), {
+    credentials: 'same-origin', cache: 'no-store', signal,
+  })
+  if (response.status === 501) return 'unsupported'
+  if (!response.ok) return 'error'
+  const result: unknown = await response.json()
+  if (result === null || typeof result !== 'object' || !('supported' in result)) return 'error'
+  return result.supported === true ? 'supported' : result.supported === false ? 'unsupported' : 'error'
+}
+
 /** Deletion is sent only by confirm(), never by the menu's request(). */
 export function createSessionDeleteActions(archive: ArchiveSource, send = fetch) {
   const listeners = new Set<() => void>()
@@ -36,7 +50,7 @@ export function createSessionDeleteActions(archive: ArchiveSource, send = fetch)
     dismiss() { if (!state?.pending) publish(null) },
     dispose() { disposed = true; listeners.clear(); state = null },
     async confirm(): Promise<void> {
-      if (disposed || state === null || state.pending || state.done) return
+      if (disposed || state === null || state.pending || state.done || state.error === 'delete.unsupported') return
       const { sessionId } = state
       if (!archive.getSnapshot().archivedSessionIds.includes(sessionId)) {
         publish({ sessionId, pending: false, done: false, error: 'delete.notArchived' })
@@ -48,6 +62,12 @@ export function createSessionDeleteActions(archive: ArchiveSource, send = fetch)
           method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId, confirmed: true }),
         })
+        // Capability can disappear between opening the menu and confirming.
+        // A 501 remains explicit even when an older Host returns a text body.
+        if (response.status === 501) {
+          publish({ sessionId, pending: false, done: false, error: 'delete.unsupported' })
+          return
+        }
         const result = await response.json() as { ok?: boolean; value?: { sessionId?: string }; error?: { code?: string } }
         if (!response.ok || result.ok !== true || result.value?.sessionId !== sessionId) {
           const key: SessionBridgeKey = ({
@@ -74,27 +94,42 @@ export function SessionDeleteMenuItem({ sessionId, archive, deleteActions, useMe
   sessionId: string; archive: ArchiveSource; deleteActions: DeleteActions
   useMenuOpenState: () => readonly [boolean, (open: boolean) => void]; t?: Translate
 }) {
-  const [, setMenuOpen] = useMenuOpenState()
+  const [menuOpen, setMenuOpen] = useMenuOpenState()
   // Host stores use receiver-bound methods; React invokes bare callbacks.
   const subscribe = useCallback((listener: () => void) => archive.subscribe(listener), [archive])
   const getSnapshot = useCallback(() => archive.getSnapshot(), [archive])
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
   const archived = snapshot.archivedSessionIds.includes(sessionId)
-  const [supported, setSupported] = useState(false)
+  const [capability, setCapability] = useState<{
+    sessionId: string; status: SessionDeleteCapability | 'checking'
+  }>({ sessionId, status: 'checking' })
   useEffect(() => {
-    if (!archived) return
+    setCapability({ sessionId, status: 'checking' })
+    if (!archived || !menuOpen) return
     const abort = new AbortController()
-    void fetch(SESSION_DELETE_PATH.slice(1), { credentials: 'same-origin', cache: 'no-store', signal: abort.signal })
-      .then(async response => response.ok ? await response.json() as { supported?: boolean } : null)
-      .then(result => { if (!abort.signal.aborted) setSupported(result?.supported === true) })
-      .catch(() => { if (!abort.signal.aborted) setSupported(false) })
-    return () => { abort.abort() }
-  }, [archived])
-  if (!archived || !supported) return null
-  return <MenuItemButton danger separatorBefore onSelect={() => {
-    setMenuOpen(false)
-    deleteActions.request(sessionId)
-  }}>{t === undefined ? en['delete.action'] : t('delete.action')}</MenuItemButton>
+    const timeout = setTimeout(() => {
+      setCapability({ sessionId, status: 'error' })
+      abort.abort()
+    }, 10_000)
+    void readSessionDeleteCapability(abort.signal)
+      .then(status => { if (!abort.signal.aborted) setCapability({ sessionId, status }) })
+      .catch(() => { if (!abort.signal.aborted) setCapability({ sessionId, status: 'error' }) })
+      .finally(() => { clearTimeout(timeout) })
+    return () => { clearTimeout(timeout); abort.abort() }
+  }, [archived, menuOpen, sessionId])
+  if (!archived) return null
+  const status = capability.sessionId === sessionId ? capability.status : 'checking'
+  const supported = status === 'supported'
+  const tr = t ?? ((key: SessionBridgeKey) => en[key])
+  const reason: SessionBridgeKey = status === 'unsupported' ? 'delete.unsupported'
+    : status === 'error' ? 'delete.checkFailed' : 'delete.checking'
+  return <>
+    <MenuItemButton danger separatorBefore disabled={!supported} onSelect={() => {
+      setMenuOpen(false)
+      deleteActions.request(sessionId)
+    }}>{tr('delete.action')}</MenuItemButton>
+    {!supported && <div className="dsh-sb-deleteHint" role="note">{tr(reason)}</div>}
+  </>
 }
 
 export function SessionDeleteDialog({ deleteActions, t }: { deleteActions: DeleteActions; t?: Translate }) {
@@ -106,7 +141,7 @@ export function SessionDeleteDialog({ deleteActions, t }: { deleteActions: Delet
     description={tr('delete.description')} onClose={deleteActions.dismiss}
     footer={<>
       <Button variant="outline" disabled={state.pending} data-modal-autofocus onClick={deleteActions.dismiss}>{tr('picker.cancel')}</Button>
-      <Button variant="primary" disabled={state.pending} onClick={() => { void deleteActions.confirm() }}>
+      <Button variant="primary" disabled={state.pending || state.error === 'delete.unsupported'} onClick={() => { void deleteActions.confirm() }}>
         {tr(state.pending ? 'delete.pending' : 'delete.confirm')}
       </Button>
     </>}>

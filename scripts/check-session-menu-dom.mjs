@@ -39,6 +39,7 @@ try {
   let plugin
   let sends = 0
   let finish
+  let probe = async () => Response.json({ supported: true })
   const registrations = new Map()
   const snapshot = { archivedSessionIds: ['archived'] }
   const archive = {
@@ -46,18 +47,26 @@ try {
     getSnapshot() { return this.snapshot },
     subscribe() { assert.equal(this, archive, 'subscribe keeps the Host store receiver'); return () => {} },
   }
-  const sandbox = {
-    window: { __ModuleLoader__: { load({ factory }) {
+  dom.window.__ModuleLoader__ = { load({ factory }) {
       plugin = factory(id => {
         if (id === 'react') return React
         if (id === 'react/jsx-runtime') return requireUi(id)
         if (id === '@deepseek-ai/dsh-client-ui-primitives') return primitives
         throw new Error('Unexpected import ' + id)
       })
-    } } }, document, navigator, console, setTimeout, clearTimeout, AbortController,
+    } }
+  const sandbox = {
+    window: dom.window, document, navigator, console, setTimeout, clearTimeout, AbortController,
+    Node: dom.window.Node, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement,
+    getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+    requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
+    cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
+    // JSDOM has no layout/ResizeObserver. As in the dedicated chip tests, this
+    // observer is inert: this script tests text/copy, never resizing or pixels.
+    ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
     fetch: async (path, options) => {
       assert.equal(path, 'api/session-bridge/delete-session')
-      if (options.method !== 'POST') return Response.json({ supported: true })
+      if (options.method !== 'POST') return await probe(options)
       sends++
       assert.deepEqual(JSON.parse(options.body), { sessionId: 'archived', confirmed: true })
       return await new Promise(resolve => { finish = resolve })
@@ -74,9 +83,11 @@ try {
     } },
   })
   let reopen
+  let closeMenu
   function View() {
     const [open, setOpen] = React.useState(true)
     reopen = () => setOpen(true)
+    closeMenu = () => setOpen(false)
     const cells = []
     for (const [id, { options, component }] of registrations) {
       if (options.name === 'shell.overlay' || (open && options.name === 'sidebar.workspaces.session.menu.item')) {
@@ -117,6 +128,52 @@ try {
   })
   assert.equal(document.querySelector('[role=dialog]'), null)
   assert.ok(document.body.textContent.includes('Chat history deleted'))
+  const sentBeforeProbes = sends
+  for (const [response, reason] of [
+    [Response.json({ supported: false }), 'This Host cannot safely delete chat history'],
+    [new Response('Unsupported', { status: 501 }), 'This Host cannot safely delete chat history'],
+    [new Response('Unavailable', { status: 503 }), 'Could not check this Host'],
+    [Response.json({ supported: 'true' }), 'Could not check this Host'],
+    [new Response('invalid JSON'), 'Could not check this Host'],
+  ]) {
+    probe = async () => response
+    await act(async () => reopen())
+    assert.equal(button('Delete session…').disabled, true)
+    assert.ok(document.querySelector('[role=note]').textContent.includes(reason))
+    await act(async () => button('Delete session…').click())
+    assert.equal(document.querySelector('[role=dialog]'), null)
+    assert.equal(sends, sentBeforeProbes, 'unavailable capability cannot submit deletion')
+    await act(async () => closeMenu())
+  }
+  let lateProbe
+  let oldSignal
+  probe = options => { oldSignal = options.signal; return new Promise(resolve => { lateProbe = resolve }) }
+  await act(async () => reopen())
+  assert.equal(button('Delete session…').disabled, true)
+  assert.ok(document.querySelector('[role=note]').textContent.includes('Checking this Host'))
+  await act(async () => closeMenu())
+  assert.equal(oldSignal.aborted, true, 'closing the menu aborts the old probe')
+  probe = async () => Response.json({ supported: false })
+  await act(async () => reopen())
+  await act(async () => lateProbe(Response.json({ supported: true })))
+  assert.equal(button('Delete session…').disabled, true, 'late success cannot override a newer unsupported result')
+  await act(async () => closeMenu())
+  probe = async () => Response.json({ supported: true })
+  await act(async () => reopen())
+  assert.equal(button('Delete session…').disabled, false, 'reopening checks capability again')
+  await act(async () => button('Delete session…').click())
+  await act(async () => button('Delete permanently').click())
+  await act(async () => finish(new Response('Unsupported', { status: 501 })))
+  const deleteDialog = document.querySelector('[role=dialog]')
+  console.log(JSON.stringify({ phase: 'post501', alerts: [...document.querySelectorAll('[role=alert]')].slice(0, 8)
+    .map(node => ({ inDeleteDialog: deleteDialog?.contains(node) ?? false, text: node.textContent.slice(0, 512) })) }))
+  assert.ok(deleteDialog, 'POST 501 must leave the deletion dialog open')
+  assert.ok(deleteDialog.querySelector('[role=alert]').textContent.includes('This Host cannot safely delete chat history'))
+  assert.equal(button('Delete permanently').disabled, true)
+  await act(async () => button('Delete permanently').click())
+  assert.equal(sends, sentBeforeProbes + 1, '501 blocks repeat confirmation')
+  await act(async () => button('Cancel').click())
+  assert.equal(document.querySelector('[role=dialog]'), null)
   const anchor = document.createElement('button')
   document.body.appendChild(anchor)
   const picks = []
@@ -171,9 +228,11 @@ try {
   const result = { status: 'passed', realReactAndPrimitives: true, builtPlugin: true, copiedSelectedRow: true,
     fullSessionIdVisible: true, fullSessionIdCopied: true, archiveReceiverPreserved: true,
     confirmationBeforeSend: true, cancelDoesNotDelete: true, pendingBlocksRepeat: true, feedbackAfterMenuClose: true,
+    unsupportedVisibleAndDisabled: true, failedProbeDistinct: true, staleProbeIgnored: true,
+    reopenChecksCapability: true, text501VisibleAndBlocksRepeat: true,
     scratchPickerSingleEntry: true, scratchIdentitySurvivesRename: true, sameTitleProjectPreserved: true,
     pickerOpenDoesNotCreate: true, firstScratchClickCreatesOnce: true, lookupFailureKeepsOrdinarySelection: true,
-    nativeElectronClicks: false, clipboardMock: true, cssLayoutVerified: false }
+    nativeElectronClicks: false, clipboardMock: true, resizeObserverMock: true, cssLayoutVerified: false }
   if (process.argv[3]) await writeFile(process.argv[3], JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
 } finally {

@@ -1,24 +1,42 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.4",
-  "candidateStatus": "offline checks passed; integrated Host and native verification pending",
+  "packageVersion": "0.1.5",
+  "candidateStatus": "validated plugin candidate; formal release and daily installation pending",
   "hardHostVersionGate": false,
-  "change": "Session identity actions remain in the left sidebar menu; redundant header ID and its overlay are no longer registered.",
+  "change": "Visible archived-delete capability states and explicit unsupported/501 handling; header remains absent; no private Host storage or persistent workspace reordering.",
   "currentChecks": {
-    "hostAndClientTypes": "passed",
+    "officialRc4ApiAudit": "exact npm 0.2.1-rc.4 declarations and runtime inspected; safe deletion API absent",
+    "hostAndClientTypes": "passed: client typecheck once and fresh Host compilation",
     "isolatedBuild": "passed",
     "clientModuleLoad": "passed with static module stubs",
     "offlineTests": {
-      "passed": 59,
+      "passed": 61,
       "failed": 0,
       "skipped": 0,
+      "cancelled": 0,
       "concurrency": 1
     },
-    "sidebarCopy": "existing selected-row ID/cwd/bridge tests passed",
-    "headerRegistration": "no header ID or identity overlay; sidebar copy and notice remain",
-    "nativeElectron": "pending",
-    "realModelCalls": 0,
-    "commandNote": "pnpm run check aborted at dependency auto-install before checks; same commands then passed using existing compiler directly, without dependency installation."
+    "componentDom": "passed after test harness fixes; real React/primitives; clipboard and ResizeObserver mocked; no pixel/native claim; original failures preserved",
+    "browserFixture": {
+      "deletionFlows": "passed in a real Codex in-app browser using the built plugin and synthetic responses",
+      "unsupportedAndFailedProbe": "visible, disabled, POST 0",
+      "post501": "visible reason; repeat confirmation disabled",
+      "cancelAndSyntheticSuccess": "cancel leaves POST unchanged; confirmed synthetic success increments it once",
+      "copyFeedback": "visible",
+      "clipboardRoundTrip": "not verified: Browser Use virtual clipboard was empty and paste was blocked; complete bytes verified by React/JSDOM only",
+      "consoleErrorsAndWarnings": 0,
+      "officialHost": false,
+      "nativeElectron": false
+    },
+    "officialRc4HostInstallation": "not run",
+    "nativeElectron": "not run",
+    "realModelCalls": "not run",
+    "commandNote": "Existing compiler/build/test commands run directly without dependency installation; pnpm build/test/check scripts unchanged. Host emit compilation provides its typecheck without repeating noEmit.",
+    "harnessFailureHistory": [
+      "global alert selector matched unrelated Copied Toast; scoped to deletion dialog",
+      "legacy header test VM lacked DOM globals; real JSDOM window/rAF/style provided; ResizeObserver remains an explicitly labelled inert test adapter",
+      "browser fixture stdin could not resolve JSX runtime; resolveDir bound to existing SDK ui-primitives"
+    ]
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -151,5 +169,21 @@
       "details": "docs/compatibility/official-alpha5-20261017.md"
     }
   },
-  "checkedOn": "2026-10-19"
+  "checkedOn": "2026-10-28",
+  "prior014Checks": {
+    "hostAndClientTypes": "passed",
+    "isolatedBuild": "passed",
+    "clientModuleLoad": "passed with static module stubs",
+    "offlineTests": {
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0,
+      "concurrency": 1
+    },
+    "sidebarCopy": "existing selected-row ID/cwd/bridge tests passed",
+    "headerRegistration": "no header ID or identity overlay; sidebar copy and notice remain",
+    "nativeElectron": "pending",
+    "realModelCalls": 0,
+    "commandNote": "pnpm run check aborted at dependency auto-install before checks; same commands then passed using existing compiler directly, without dependency installation."
+  }
 }

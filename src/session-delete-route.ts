@@ -17,7 +17,8 @@ export function registerSessionDeleteRoute(ctx: HostContext): void {
           try {
             if (closing) throw new Error('session/delete-busy')
             if (request.method === 'GET') {
-              return Response.json({ supported: typeof controller.deleteArchivedSession === 'function' },
+              const supported = typeof controller.deleteArchivedSession === 'function'
+              return Response.json(supported ? { supported } : { supported, reason: 'session/delete-unsupported' },
                 { headers: { 'cache-control': 'no-store' } })
             }
             if (request.headers.get('content-type')?.split(';', 1)[0]?.trim() !== 'application/json') {
@@ -25,7 +26,7 @@ export function registerSessionDeleteRoute(ctx: HostContext): void {
             }
             const sessionId = deletionSessionId(await request.json())
             request.signal.throwIfAborted()
-            if (controller.deleteArchivedSession === undefined) {
+            if (typeof controller.deleteArchivedSession !== 'function') {
               status = 501
               throw new Error('session/delete-unsupported')
             }

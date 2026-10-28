@@ -4,7 +4,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **0.1.4** (session ID moved to the sidebar menu).
+- Package: `@missher/dsh-session-bridge`; version: **0.1.5** (explicit deletion capability feedback).
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference, and archived rows carry a confirmed delete entry.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -12,20 +12,20 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 ## Install and update
 
-Select 0.1.4 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-0.1.4.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
+Select 0.1.5 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-0.1.5.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.4.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-0.1.5.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.4.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.5.tgz
 ```
 
 Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do not enable the old `dsh-session-bridge`, the `session-bridge-dev` alias and the scoped package together: they register the same tools, including `session_list`. Keep the previous package/configuration and let active work finish before reloading an upgrade.
@@ -36,7 +36,7 @@ Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do 
 
 Open the target session's three-dot menu in the left sidebar and choose “Copy session ID”. The copied value keeps the complete `session-` prefix. The same menu copies the working directory or `/bridge <session-id> ` reference. The header no longer renders a duplicate ID control or its detail panel.
 
-Actions use the selected row, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback. Archived rows additionally offer a confirmed “Delete session…” entry when the Host supports that capability.
+Actions use the selected row, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback. Archived rows always show “Delete session…”. Supported Hosts require confirmation; unsupported Hosts show a disabled entry and the reason. Checking, failed checks and unsupported capability are distinct states. Reopen the menu to check again. A POST 501 also shows an explicit error and blocks repeat confirmation.
 
 ### “Not in a workspace” and scratch
 
@@ -71,6 +71,10 @@ Cleanup selects registered workspaces under the canonical `scratchRoot` whose di
 
 ## Host and platform boundaries
 
+0.1.5 inspects exact official npm **DSH 0.2.1-rc.4** contracts and implementations. There is no public permanent-delete operation coordinating writer ownership, concurrent forks and log/index consistency, so the plugin explains the limitation and leaves private storage untouched. Official `workspaces.insertBefore` changes persistent order; it is not a disposable sidebar placement hook. The sidebar therefore retains Host ordering and manual dragging, while the plugin’s scratch picker entry stays last. See the [API and risk report](docs/compatibility/official-rc4-0.1.5.md) and `COMPATIBILITY.json` for current evidence. Static API inspection does not establish official Host installation or native Electron acceptance.
+
+0.1.5 passes client types, Host/client builds, module loading, all 61 offline tests and real React/JSDOM interactions. Actual browser clicks over synthetic responses cover unsupported capability, failed checks, POST 501, cancellation and synthetic success. No full official rc.4 Host or Electron was run. The browser tool’s virtual clipboard could not round-trip the copied value; exact copied bytes were verified only in component tests.
+
 After removing the header ID in 0.1.4, Host/client typechecks, the isolated build, module loading and all 59 offline tests pass (0 failures, 0 skips). Sidebar copying of the complete ID, directory and bridge reference remains covered. The 0.1.3 records below remain historical baselines.
 
 2026-10-17 increment: the **unchanged released 0.1.3 tarball** passed bounded Loader, session list/read, scratch reuse, missing-capability and unload checks against official npm DSH **0.2.1-alpha.5**. No runtime file was changed or repackaged. This official Host lacks `deleteArchivedSession` and `registerTrailingWorkspace`: archive deletion is unavailable and scratch keeps normal Host ordering.
@@ -79,7 +83,7 @@ No alpha.5 browser or native Electron UI was tested in this increment; the earli
 
 There is no hard Host version gate: admission is capability-based, not version-based. The rc.2 development SDK pin is a development link only, not a compatibility gate.
 
-The following records describe 0.1.3; they do not constitute 0.1.4 acceptance. On 2026-10-14, Linux x64 / Node 22.22.1, two actual **Missher community distributions** were exercised (both modified for this desktop product; neither is an unmodified official build):
+The following records describe 0.1.3; they do not constitute 0.1.5 acceptance. On 2026-10-14, Linux x64 / Node 22.22.1, two actual **Missher community distributions** were exercised (both modified for this desktop product; neither is an unmodified official build):
 
 | | DSH 0.2.0-rc.2 / Cordis 4.0.4 | DSH 0.2.1-alpha.2 / Cordis 4.0.5-alpha.1 (desktop 0.2.1-alpha.2.20261014.1) |
 | --- | --- | --- |
@@ -93,12 +97,14 @@ The following records describe 0.1.3; they do not constitute 0.1.4 acceptance. O
 | --- | --- | --- |
 | ID display and copying, cross-session tools, scratch and the picker entry | Provided by the plugin | Provided by the plugin |
 | Place the scratch group last in the sidebar | Normal ordering | Uses `uiWorkspace.registerTrailingWorkspace`; persisted order is unchanged |
-| Permanently delete archived history | The entry is hidden; the request answers POST 501 without reading private storage | Archived row → Delete session → confirmation; chat history only, workspace files preserved |
+| Permanently delete archived history | The disabled entry explains why; the request answers POST 501 without reading private storage | Archived row → Delete session → confirmation; chat history only, workspace files preserved |
 | Dedicated archive icon in the workspace toolbar | Belongs to the Host, not supplied in this plugin package | Same |
+
+Deletion cannot be undone. To preserve history, normally quit every process using that data directory and back up the complete profile plus its configured persistence storage. Restore the same complete snapshot while all such processes are stopped; restoring one log alone is insufficient.
 
 Deletion depends on the optional `sessionController.deleteArchivedSession`. When it is missing the plugin does not invent a private deletion path and does not read private Host logs. The Host enforces the guards for running sessions, other writers and derived child sessions.
 
-See `COMPATIBILITY.json` for the evidence layers. Version 0.1.3 builds in isolation on Linux and its 59 offline tests pass (0 failed, 0 skipped, worker 1); 12 of those are React and JSDOM chip/panel checks over controlled geometry, which are behavioural checks rather than pixel or browser layout evidence. `check-host-contracts` passes against the shared Host **source SDK declarations**; the packaged Host ships no `.d.ts`. Style ownership and peer reload/self reload/unload pass on the installed alpha.2 module system with the real Cordis Loader; the historical "unowned style gets claimed" negative control does not reproduce on this newer Host (owner is null), so that older failure description does not apply. Archive-delete confirm/cancel/delete are real rc.2 clicks over synthetic records: workspace files and other sessions are preserved, and the deletion survives a restart. Native Electron clicks, real-model calls, other official versions and other platforms are not accepted.
+See `COMPATIBILITY.json` for the evidence layers. Version 0.1.3 builds in isolation on Linux and its 59 offline tests pass (0 failed, 0 skipped, worker 1); 12 of those are React and JSDOM chip/panel checks over controlled geometry, which are behavioural checks rather than pixel or browser layout evidence. `check-host-contracts` passes against the shared Host **source SDK declarations**; the inspected community packages lacked the corresponding declarations; official rc.4 npm packages now include them. Style ownership and peer reload/self reload/unload pass on the installed alpha.2 module system with the real Cordis Loader; the historical "unowned style gets claimed" negative control does not reproduce on this newer Host (owner is null), so that older failure description does not apply. Archive-delete confirm/cancel/delete are real rc.2 clicks over synthetic records: workspace files and other sessions are preserved, and the deletion survives a restart. Native Electron clicks, real-model calls, other official versions and other platforms are not accepted.
 
 Archived-row confirmation on Missher community DSH 0.2.0-rc.2, synthetic records only:
 
@@ -157,7 +163,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.4.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-0.1.5.tgz
 ```
 
 The SDK link is for development only and is neither committed nor packaged. The tarball contains compiled runtime files, corresponding source, licenses and user documentation; development scripts and historical local receipts remain in Git. The Node entry uses structural `ctx` services without runtime imports from `@deepseek-ai/dsh-*`. The client keeps three existing Host static requests: `react`, `react/jsx-runtime` and `@deepseek-ai/dsh-client-ui-primitives`. No runtime dependencies were added.

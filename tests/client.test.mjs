@@ -103,6 +103,7 @@ it('keeps identity actions in the sidebar without a header control or identity o
   }
   assert.equal(registrations.filter(entry => entry.id === 'session-bridge-picker').length, 1)
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.copy-notice').length, 1)
+  assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.delete-dialog').length, 1)
 })
 
 it('reports a missing cwd or clipboard rejection without inventing a directory', async () => {
@@ -234,10 +235,50 @@ it('keeps old-Host and busy failures explicit and suppresses late feedback after
   assert.equal(actions.getSnapshot().error, 'delete.unsupported')
   response = Response.json({ ok: false, error: { code: 'session/delete-owned' } }, { status: 409 })
   await actions.confirm()
+  assert.equal(actions.getSnapshot().error, 'delete.unsupported', 'an unsupported dialog cannot submit again')
+  actions.dismiss()
+  actions.request('archived')
+  await actions.confirm()
   assert.equal(actions.getSnapshot().error, 'delete.busy')
   response = Response.json({ ok: true, value: { sessionId: 'archived' } })
   const pending = actions.confirm()
   actions.dispose()
   await pending
+  assert.equal(actions.getSnapshot(), null)
+})
+
+it('distinguishes unsupported deletion from a failed or malformed capability check', async () => {
+  const signal = new AbortController().signal
+  for (const [body, status, expected] of [
+    [{ supported: true }, 200, 'supported'], [{ supported: false }, 200, 'unsupported'],
+    [{ supported: 'true' }, 200, 'error'], [{}, 200, 'error'], [null, 200, 'error'],
+    [{ supported: true }, 403, 'error'], [{ supported: false }, 500, 'error'],
+  ]) {
+    const result = await client.readSessionDeleteCapability(signal, async (path, options) => {
+      assert.equal(path, 'api/session-bridge/delete-session')
+      assert.equal(options.method, undefined, 'a capability probe cannot delete')
+      assert.equal(options.signal, signal)
+      assert.equal(options.cache, 'no-store')
+      return Response.json(body, { status })
+    })
+    assert.equal(result, expected)
+  }
+  assert.equal(await client.readSessionDeleteCapability(signal, async () => new Response('Unavailable', { status: 501 })), 'unsupported')
+  await assert.rejects(client.readSessionDeleteCapability(signal, async () => new Response('not JSON')))
+  await assert.rejects(client.readSessionDeleteCapability(signal, async () => { throw new Error('network unavailable') }))
+})
+
+it('reports text-only POST 501 and blocks repeated confirmation until the dialog is reopened', async () => {
+  let sends = 0
+  const actions = client.createSessionDeleteActions({ getSnapshot: () => ({ archivedSessionIds: ['archived'] }) }, async () => {
+    sends++
+    return new Response('Unsupported', { status: 501 })
+  })
+  actions.request('archived')
+  await actions.confirm()
+  await actions.confirm()
+  assert.equal(sends, 1)
+  assert.equal(actions.getSnapshot().error, 'delete.unsupported')
+  actions.dismiss()
   assert.equal(actions.getSnapshot(), null)
 })
