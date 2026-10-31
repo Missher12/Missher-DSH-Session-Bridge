@@ -11,8 +11,15 @@ export type SessionCopyKind = CopyPayload['key']
 /** The global summary list reads metadata without activating a Session. */
 export interface SessionListReader {
   readonly list: {
-    getSnapshot(): { readonly byId: Readonly<Record<string, { readonly cwd?: string } | undefined>> }
+    getSnapshot(): {
+      readonly byId: Readonly<Record<string, {
+        readonly cwd?: string
+        readonly running?: boolean
+      } | undefined>>
+    }
   }
+  /** Refresh the Host-backed summaries; optional on older Hosts. */
+  refresh?(): void
 }
 
 interface CopyNotice {

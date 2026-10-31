@@ -38,14 +38,24 @@ try {
   const primitives = primitiveModule.exports
   let plugin
   let sends = 0
+  let moveSends = 0
   let finish
+  let finishMove
+  let refreshes = 0
   let probe = async () => Response.json({ supported: true })
   const registrations = new Map()
-  const snapshot = { archivedSessionIds: ['archived'] }
-  const archive = {
-    snapshot,
-    getSnapshot() { return this.snapshot },
-    subscribe() { assert.equal(this, archive, 'subscribe keeps the Host store receiver'); return () => {} },
+  const sessionsRow = { archived: { cwd: '/synthetic/workspace', running: false } }
+  const workspacesList = {
+    getSnapshot() {
+      return {
+        items: [
+          { workspaceId: 'workspace-source', title: 'Outside a workspace', path: '/private/tmp/dsh-scratch', sessionIds: ['archived', 'drag-me'] },
+          { workspaceId: 'workspace-target', title: 'Crodis', path: '/Users/missher/Documents/Deepseek-File/Crodis', sessionIds: [] },
+        ],
+        archivedSessionIds: ['archived'],
+      }
+    },
+    subscribe() { assert.equal(this, workspacesList, 'subscribe keeps the Host store receiver'); return () => {} },
   }
   dom.window.__ModuleLoader__ = { load({ factory }) {
       plugin = factory(id => {
@@ -65,19 +75,26 @@ try {
     // observer is inert: this script tests text/copy, never resizing or pixels.
     ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
     fetch: async (path, options) => {
-      assert.equal(path, 'api/session-bridge/delete-session')
-      if (options.method !== 'POST') return await probe(options)
-      sends++
-      assert.deepEqual(JSON.parse(options.body), { sessionId: 'archived', confirmed: true })
-      return await new Promise(resolve => { finish = resolve })
+      if (path === 'api/session-bridge/delete-session') {
+        if (options.method !== 'POST') return await probe(options)
+        sends++
+        assert.deepEqual(JSON.parse(options.body), { sessionId: 'archived', confirmed: true })
+        return await new Promise(resolve => { finish = resolve })
+      }
+      if (path === 'api/session-bridge/move-session') {
+        moveSends++
+        assert.deepEqual(JSON.parse(options.body), { sessionId: 'drag-me', targetWorkspaceId: 'workspace-target', confirmed: true })
+        return await new Promise(resolve => { finishMove = resolve })
+      }
+      throw new Error('Unexpected route ' + path)
     },
   }
   vm.runInNewContext(await readFile(new URL('../lib/client/index.js', import.meta.url), 'utf8'), sandbox)
   plugin.apply({
     effect(start) { const dispose = start(); if (typeof dispose === 'function') cleanup.push(dispose) },
     locale: { register: () => () => {} },
-    uiWorkspace: {}, workspaces: { list: archive },
-    sessions: { list: { getSnapshot: () => ({ byId: { archived: { cwd: '/synthetic/workspace' } } }) } },
+    uiWorkspace: {}, workspaces: { list: workspacesList },
+    sessions: { refresh: () => { refreshes++ }, list: { getSnapshot: () => ({ byId: sessionsRow }) } },
     slots: { inject(_slot, register) { register() }, register(options, component) {
       registrations.set(options.id, { options, component }); return () => {}
     } },
@@ -128,6 +145,7 @@ try {
   })
   assert.equal(document.querySelector('[role=dialog]'), null)
   assert.ok(document.body.textContent.includes('Chat history deleted'))
+  assert.equal(refreshes, 1, 'a committed deletion refreshes the Session summaries')
   const sentBeforeProbes = sends
   for (const [response, reason] of [
     [Response.json({ supported: false }), 'This Host cannot safely delete chat history'],
@@ -174,6 +192,50 @@ try {
   assert.equal(sends, sentBeforeProbes + 1, '501 blocks repeat confirmation')
   await act(async () => button('Cancel').click())
   assert.equal(document.querySelector('[role=dialog]'), null)
+  const dragSource = document.createElement('div')
+  dragSource.dataset.rowKey = 'session:drag-me'
+  const sourceWorkspace = document.createElement('div')
+  sourceWorkspace.dataset.rowKey = 'workspace:workspace-source'
+  const targetWorkspace = document.createElement('div')
+  targetWorkspace.dataset.rowKey = 'workspace:workspace-target'
+  document.body.append(dragSource, sourceWorkspace, targetWorkspace)
+  const fireDrag = (element, type) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: { dropEffect: 'none' } })
+    element.dispatchEvent(event)
+    return event
+  }
+  await act(async () => {
+    fireDrag(dragSource, 'dragstart')
+    const over = fireDrag(targetWorkspace, 'dragover')
+    assert.equal(over.defaultPrevented, true, 'a different Workspace header accepts the drop')
+    fireDrag(targetWorkspace, 'drop')
+  })
+  assert.equal(moveSends, 1, 'dropping a session on another Workspace sends one move')
+  assert.ok(document.body.textContent.includes('Moving…'))
+  await act(async () => {
+    finishMove(Response.json({ ok: true, value: { sessionId: 'drag-me', targetWorkspaceId: 'workspace-target' } }))
+    await Promise.resolve()
+  })
+  assert.ok(document.body.textContent.includes('Session moved'))
+  assert.equal(refreshes, 2, 'a committed drag move refreshes the Session summaries')
+  await act(async () => {
+    fireDrag(dragSource, 'dragstart')
+    const same = fireDrag(sourceWorkspace, 'dragover')
+    assert.equal(same.defaultPrevented, false, 'same-Workspace drag keeps the native reorder path')
+    fireDrag(sourceWorkspace, 'drop')
+  })
+  assert.equal(moveSends, 1, 'same-Workspace drop has no side effect')
+  await act(async () => {
+    fireDrag(dragSource, 'dragstart')
+    fireDrag(targetWorkspace, 'drop')
+  })
+  assert.equal(moveSends, 2)
+  await act(async () => {
+    finishMove(Response.json({ ok: false, error: { code: 'session/move-active' } }, { status: 409 }))
+    await Promise.resolve()
+  })
+  assert.ok(document.body.textContent.includes('still has active work'))
   const anchor = document.createElement('button')
   document.body.appendChild(anchor)
   const picks = []
@@ -232,6 +294,7 @@ try {
     reopenChecksCapability: true, text501VisibleAndBlocksRepeat: true,
     scratchPickerSingleEntry: true, scratchIdentitySurvivesRename: true, sameTitleProjectPreserved: true,
     pickerOpenDoesNotCreate: true, firstScratchClickCreatesOnce: true, lookupFailureKeepsOrdinarySelection: true,
+    dragAcrossWorkspace: true, dragSameWorkspaceNoop: true, dragRefusalShown: true,
     nativeElectronClicks: false, clipboardMock: true, resizeObserverMock: true, cssLayoutVerified: false }
   if (process.argv[3]) await writeFile(process.argv[3], JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))

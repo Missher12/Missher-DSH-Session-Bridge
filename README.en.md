@@ -4,9 +4,9 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **0.1.5** (explicit deletion capability feedback).
+- Package: `@missher/dsh-session-bridge`; version: **0.1.8** local candidate (confirmed delete; sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
-- The sidebar menu also copies the full ID, the working directory and the session reference, and archived rows carry a confirmed delete entry.
+- The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 
@@ -36,7 +36,7 @@ Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do 
 
 Open the target session's three-dot menu in the left sidebar and choose “Copy session ID”. The copied value keeps the complete `session-` prefix. The same menu copies the working directory or `/bridge <session-id> ` reference. The header no longer renders a duplicate ID control or its detail panel.
 
-Actions use the selected row, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback. Archived rows always show “Delete session…”. Supported Hosts require confirmation; unsupported Hosts show a disabled entry and the reason. Checking, failed checks and unsupported capability are distinct states. Reopen the menu to check again. A POST 501 also shows an explicit error and blocks repeat confirmation.
+Actions use the selected row, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback. “Delete session…” appears for ordinary and archived rows; dragging a session row onto a workspace header calls the same Host move transaction. A Host exposing `sessionController.deleteSession`/`moveSession` (or the legacy `deleteArchivedSession`) runs its own transaction after confirmation or a real drop. Unsupported Hosts show a disabled delete entry and the reason. Drag failures, running refusals and same-workspace drops are reported separately; a failed drop never shows success.
 
 ### “Not in a workspace” and scratch
 
@@ -97,7 +97,8 @@ The following records describe 0.1.3; they do not constitute 0.1.5 acceptance. O
 | --- | --- | --- |
 | ID display and copying, cross-session tools, scratch and the picker entry | Provided by the plugin | Provided by the plugin |
 | Place the scratch group last in the sidebar | Normal ordering | Uses `uiWorkspace.registerTrailingWorkspace`; persisted order is unchanged |
-| Permanently delete archived history | The disabled entry explains why; the request answers POST 501 without reading private storage | Archived row → Delete session → confirmation; chat history only, workspace files preserved |
+| Permanently delete history (ordinary or archived) | The disabled entry explains why; the request answers POST 501 without reading private storage | Row → Delete session → confirmation; chat history only, workspace files preserved |
+| Move a session to another workspace | The drop reports the refusal/unsupported reason; POST 501; no log/header/workspace rewrite | Drag a session row onto a sidebar workspace header; id, title and full history kept; later turns use the target directory; same-workspace drops are no-ops |
 | Dedicated archive icon in the workspace toolbar | Belongs to the Host, not supplied in this plugin package | Same |
 
 Deletion cannot be undone. To preserve history, normally quit every process using that data directory and back up the complete profile plus its configured persistence storage. Restore the same complete snapshot while all such processes are stopped; restoring one log alone is insufficient.

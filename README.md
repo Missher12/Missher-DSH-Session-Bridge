@@ -4,9 +4,9 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**0.1.5**（顶部 ID 已移至侧栏菜单）。
+- 包名：`@missher/dsh-session-bridge`；版本：**0.1.8**（删除会话；侧栏拖放移动工作区，依赖宿主生命周期接口）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
-- 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；归档记录带二次确认的删除入口。
+- 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
 - [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
@@ -36,7 +36,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.5.
 
 在左侧找到目标会话，点击该行的三点菜单，选择“复制会话 ID”。复制结果保留完整 `session-` 前缀；菜单也能复制工作目录或 `/bridge <session-id> ` 引用。顶部只保留会话标题和其他操作，不再显示重复的 ID 控件或详情浮层。
 
-操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。归档记录始终显示“删除会话…”入口。支持安全删除接口时，点击后再确认；不支持时禁用并显示原因。查询中、查询失败和宿主不支持会分别说明，重新打开菜单即可重查。若确认时宿主返回 501，弹窗明确说明不支持并禁止重复提交。
+操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。宿主提供 `sessionController.deleteSession`（或旧的 `deleteArchivedSession`）与 `sessionController.moveSession` 时，删除进入确认，拖放调用同一移动事务；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。宿主缺少对应原子接口时删除入口禁用并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
 
 ### 「不在工作区」与 scratch
 
@@ -99,7 +99,8 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.5.
 | --- | --- | --- |
 | ID 显示与复制、跨会话工具、scratch、选择器末尾入口 | 插件提供 | 插件提供 |
 | 将“不在工作区”组排在侧栏其他工作区之后 | 保留普通排序 | 使用 `uiWorkspace.registerTrailingWorkspace`；不改持久排序 |
-| 永久删除归档聊天记录 | 显示禁用入口及原因；请求返回 POST 501，且不读取私有存储 | 归档行“删除会话…”二次确认；仅删聊天记录，工作区文件保留 |
+| 永久删除聊天记录（普通或归档） | 显示禁用入口及原因；请求返回 POST 501，且不读取私有存储 | 会话菜单“删除会话…”二次确认；仅删聊天记录，工作区文件保留 |
+| 将会话拖到另一个工作区 | 拖放后 Host 拒绝/不可用会显示原因；不重写日志/头/工作区表 | 会话行拖到侧栏工作区行；保留 ID、标题、完整记录，后续使用目标目录；同工作区拖放无副作用 |
 | 工作区标题栏的专用归档图标 | 属于 Host，不由本插件包提供 | 同左 |
 
 归档记录的二次确认（Missher 社区发行版 DSH 0.2.0-rc.2，仅合成记录）：
@@ -111,7 +112,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-0.1.5.
 
 删除不可撤销。需要保留记录时，应先正常退出所有使用该数据目录的进程，备份完整 profile 与其实际配置的持久化存储；恢复时也先正常退出，并整体恢复同一份快照，不能只补回单个日志文件。
 
-删除能力依赖可选的 `sessionController.deleteArchivedSession`：缺失时插件不补私有删除路径，也不读取 Host 私有日志。运行中、被其他写入者占用或存在派生子会话时的保护由 Host 执行。
+删除/移动能力依赖可选的 Host 生命周期接口：`sessionController.deleteSession`（优先）或 `deleteArchivedSession`（旧宿主），以及 `sessionController.moveSession`。缺失时插件不补私有删除路径，也不读取或改写 Host 私有日志、头或工作区表。运行中、被其他写入者占用、存在派生子会话以及移动目标校验由 Host 执行。当前官方 DSH 0.2.1-rc.4 没有这些接口；隔离的宿主源码补丁及其边界见 [host-lifecycle-patch-20261031.md](docs/compatibility/host-lifecycle-patch-20261031.md)。
 
 验证层次见 `COMPATIBILITY.json`。0.1.3在 Linux 隔离构建，59 条离线测试全通过（0 失败 0 跳过，worker 1）；其中 12 条 chip/浮层测试是 React + JSDOM 的受控几何行为检查，不等于像素或浏览器布局证据。`check-host-contracts` 通过的是共享 Host **source SDK 声明**，当时核查的社区安装包未提供对应 `.d.ts`；官方 rc.4 npm 包已有声明。样式所有权与 peer reload/self reload/unload 在真实安装的 alpha.2 模块系统 + Cordis Loader 上通过；历史上“无主 style 被 claim”的负对照在新版不再复现（owner 为 null），旧故障复现说法不适用于本版。归档删除的确认/取消/删除为 rc.2 真实点击、仅合成记录，工作区文件与其他会话保留、重启后删除仍持久。原生 Electron 点击、真实模型调用、其他官方版本与其他平台未验收。
 

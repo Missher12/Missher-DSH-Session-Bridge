@@ -31,6 +31,7 @@ import { info, systemPromptOf, warn } from './dsh.ts'
 import { bridgePromptText } from './prompt.ts'
 import { defaultScratchRoot } from './scratch.ts'
 import { registerSessionDeleteRoute } from './session-delete-route.ts'
+import { registerSessionMoveRoute } from './session-move-route.ts'
 import { registerScratchRoute } from './scratch-route.ts'
 import { registerBridgeTools, type ToolPolicy } from './tools.ts'
 
@@ -181,6 +182,7 @@ export function apply(ctx: HostContext, config: Config = {}): void {
   ctx.inject(['commands'], scope => { registerBridgeCommands(scope, policy) })
   registerScratchRoute(ctx, resolved.scratchRoot)
   registerSessionDeleteRoute(ctx)
+  registerSessionMoveRoute(ctx)
 
   if (!resolved.announceSessionId) {
     info(ctx, `session-bridge: ready · scratch root ${resolved.scratchRoot} · own-session-id prompt section disabled`)

@@ -1,0 +1,1882 @@
+diff --git a/packages/api/session-controller/src/agent.ts b/packages/api/session-controller/src/agent.ts
+index aaacc886..83542fc1 100644
+--- a/packages/api/session-controller/src/agent.ts
++++ b/packages/api/session-controller/src/agent.ts
+@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises'
+ import type { Context } from '@deepseek-ai/cordis'
+ import { installModelSelection } from '@deepseek-ai/dsh-agent'
+ import type {
+-  Agent, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
++  Agent, AgentHandle, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
+ } from '@deepseek-ai/dsh-agent'
+ import type {} from '@deepseek-ai/dsh-agent-default-model'
+ import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+@@ -172,9 +172,16 @@ export class ApiSessionAgentController {
+   private readonly claims = new Map<SessionId, Promise<void>>()
+   private readonly selections = new WeakMap<Agent, InstalledSelection>()
+   private readonly imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
++  /**
++   * Disposal capabilities for Agents this controller created or resumed.
++   * `ctx.agents.get()` intentionally exposes only the bare Agent, so the owner
++   * that may release an idle Session is this map.
++   */
++  private readonly handles = new Map<SessionId, AgentHandle>()
+ 
+   /** @param ctx - Host context carrying Agent, model, persistence, and Typert services. */
+   constructor(private readonly ctx: Context) {
++    ctx.on('agent/disposed', ({ agent }) => { this.handles.delete(agent.id) })
+     ctx.typert.lookups.configure('agent', async (sessionId: SessionId) => {
+       const found = await this.resolveAgent(sessionId)
+       if ('error' in found) throw found.error
+@@ -192,6 +199,34 @@ export class ApiSessionAgentController {
+     })
+   }
+ 
++  /**
++   * Retain the disposal capability returned by the Agent factory.
++   * @param handle - the handle the registry returned for this controller's creation.
++   * @returns the bare published Agent.
++   */
++  adopt(handle: AgentHandle): Agent {
++    this.handles.set(handle.agent.id, handle)
++    return handle.agent
++  }
++
++  /**
++   * Release one idle Agent this controller owns so a Host lifecycle operation
++   * can take the Session's writer lease. A running Agent is never released.
++   * @param sessionId - Session identity.
++   * @returns `missing` when no Agent is live, `released` after a successful handle disposal,
++   *   `running` while the Agent is executing, and `unmanaged` when another owner holds the agent.
++   */
++  async releaseIdle(sessionId: SessionId): Promise<'missing' | 'released' | 'running' | 'unmanaged'> {
++    const agent = this.ctx.agents.get(sessionId)
++    if (agent === undefined) return 'missing'
++    if (agent.status === 'running') return 'running'
++    const handle = this.handles.get(sessionId)
++    if (handle === undefined) return 'unmanaged'
++    this.handles.delete(sessionId)
++    await handle.dispose()
++    return 'released'
++  }
++
+   /**
+    * Resolve or resume one ordinary Session, deduplicating concurrent resumes.
+    * @param sessionId - ordinary Session identity.
+@@ -437,11 +472,11 @@ export class ApiSessionAgentController {
+     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {
+       throw new ApiSessionSubagentOwnership(sessionId)
+     }
+-    return (await this.ctx.agents.resume({
++    return this.adopt(await this.ctx.agents.resume({
+       resumeSessionId: sessionId,
+       agentOptions: this.agentOptions(),
+       setup: composition.setup,
+-    })).agent
++    }))
+   }
+ 
+   private async inOrder<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
+@@ -491,11 +526,11 @@ export class ApiSessionAgentController {
+     if (!reusable) return this.createMinted(request.cwd, composition)
+     this.assertPresetApplicable(sessionId, request.agentPreset)
+     try {
+-      return (await this.ctx.agents.resume({
++      return this.adopt(await this.ctx.agents.resume({
+         resumeSessionId: sessionId,
+         agentOptions: this.agentOptions(),
+         setup: this.reuseSetup(composition),
+-      })).agent
++      }))
+     } catch (error: unknown) {
+       if (error instanceof ApiSessionStartedSinceObserved) return this.createMinted(request.cwd, composition)
+       if (!(error instanceof Error) || error.name !== 'SessionAlreadyOwnedError') throw error
+@@ -566,7 +601,7 @@ export class ApiSessionAgentController {
+     } catch (error: unknown) {
+       throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
+     }
+-    return (await this.ctx.agents.create({
++    return this.adopt(await this.ctx.agents.create({
+       sessionId,
+       agentOptions: this.agentOptions(),
+       meta: {
+@@ -574,7 +609,7 @@ export class ApiSessionAgentController {
+         ...(composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset }),
+       },
+       setup: composition.setup,
+-    })).agent
++    }))
+   }
+ 
+   private agentOptions(): AgentOptions {
+diff --git a/packages/api/session-controller/src/commands.ts b/packages/api/session-controller/src/commands.ts
+index 8dd38573..e8c84686 100644
+--- a/packages/api/session-controller/src/commands.ts
++++ b/packages/api/session-controller/src/commands.ts
+@@ -273,7 +273,7 @@ export class SessionCommandController {
+     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+     try {
+       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
+-      await this.ctx.agents.create({
++      this.agents.adopt(await this.ctx.agents.create({
+         sessionId: childId,
+         seed,
+         inheritedEventCount: SessionLogOffset(boundary + 1),
+@@ -287,7 +287,7 @@ export class SessionCommandController {
+         },
+         agentOptions: { provider, model },
+         setup: composition.setup,
+-      })
++      }))
+     } catch (error) {
+       throw new RemoteError(
+         'gateway/internal',
+diff --git a/packages/api/session-controller/src/index.ts b/packages/api/session-controller/src/index.ts
+index 2362bce2..48d75c0e 100644
+--- a/packages/api/session-controller/src/index.ts
++++ b/packages/api/session-controller/src/index.ts
+@@ -25,6 +25,7 @@ import {
+ import { SessionCommandController, hasPromptContent } from './commands.ts'
+ import { SessionControlController } from './control.ts'
+ import { SessionHistoryController } from './history.ts'
++import { SessionLifecycleController } from './lifecycle.ts'
+ import { SessionFileReferences } from './file-references.ts'
+ import { ApiSessionList } from './list.ts'
+ import { buildModelCatalog, hasProviderApiKey } from './catalog.ts'
+@@ -72,6 +73,8 @@ export type * from './types.ts'
+ export { ApiSessionNotFound } from './agent.ts'
+ export { SessionFileReferences } from './file-references.ts'
+ export { SessionSkillCatalog } from './skill-catalog.ts'
++export { SessionLifecycleController, SessionLifecycleError } from './lifecycle.ts'
++export type { SessionLifecycleErrorCode } from './lifecycle.ts'
+ 
+ declare module '@deepseek-ai/cordis' {
+   interface Context {
+@@ -126,6 +129,7 @@ export class SessionController extends TypertRemoteService {
+     'llm',
+     'remoteAccess',
+     'sessions',
++    'sessionPersistence',
+     'sessionProjections',
+     'sessionQuery',
+     'typert',
+@@ -141,6 +145,7 @@ export class SessionController extends TypertRemoteService {
+   private readonly commands: SessionCommandController
+   private readonly controlState: SessionControlController
+   private readonly history: SessionHistoryController
++  private readonly lifecycle: SessionLifecycleController
+   private readonly listState: ApiSessionList
+   private readonly openPath: (path: string, signal: AbortSignal) => Promise<void>
+   private readonly fileApplications: typeof nativeFileApplications
+@@ -148,6 +153,8 @@ export class SessionController extends TypertRemoteService {
+   private readonly revealPath: (path: string, signal: AbortSignal) => Promise<void>
+   private readonly canOpenPath: () => boolean
+   private readonly promotions = new Set<Promise<void>>()
++  /** Serializes fork against delete/move for the same Session lineage. */
++  private readonly lineageChains = new Map<SessionId, Promise<void>>()
+ 
+   /**
+    * @param ctx - Host context containing the Session capability assembly.
+@@ -173,6 +180,7 @@ export class SessionController extends TypertRemoteService {
+       await Promise.allSettled([...this.promotions])
+     }, 'session-controller.promotions')
+     this.history = new SessionHistoryController(ctx, (observation) => { this.promote(observation) })
++    this.lifecycle = new SessionLifecycleController(ctx, this.agents)
+     this.listState = new ApiSessionList(ctx, resolved.listWorkSliceMs)
+     this.fileApplications = internals.fileApplications ?? nativeFileApplications
+     this.openFileApplication = internals.openFileApplication ?? openNativeFileApplication
+@@ -266,6 +274,51 @@ export class SessionController extends TypertRemoteService {
+     return inspectApiSession(this.ctx, sessionId, signal)
+   }
+ 
++  /**
++   * Permanently delete one stored Session. Host-owned transaction; see
++   * {@link SessionLifecycleController.deleteSession}.
++   * @param sessionId - the stored Session to delete.
++   */
++  deleteSession(sessionId: SessionId): Promise<void> {
++    return this.inLineage(sessionId, () => this.lifecycle.deleteSession(sessionId))
++  }
++
++  /**
++   * Permanently delete one archived Session (legacy archived-only contract).
++   * @param sessionId - the archived Session to delete.
++   */
++  deleteArchivedSession(sessionId: SessionId): Promise<void> {
++    return this.inLineage(sessionId, () => this.lifecycle.deleteArchivedSession(sessionId))
++  }
++
++  /**
++   * Move one stored Session to another Workspace. Host-owned transaction; see
++   * {@link SessionLifecycleController.moveSession}.
++   * @param sessionId - the stored Session to move.
++   * @param targetWorkspaceId - registered Workspace identity to move to.
++   */
++  moveSession(sessionId: SessionId, targetWorkspaceId: string): Promise<void> {
++    return this.inLineage(sessionId, () => this.lifecycle.moveSession(sessionId, targetWorkspaceId))
++  }
++
++  /**
++   * Serialize one Session-lineage operation (fork versus delete/move) for the
++   * same identity. The fork path reads the parent and creates the child inside
++   * the same slot, so a delete that follows cannot interleave between the
++   * parent read and the child creation.
++   * @param sessionId - lineage identity.
++   * @param operation - operation to run after any prior lineage operation settles.
++   * @returns the operation's result.
++   */
++  private inLineage<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
++    const result = (this.lineageChains.get(sessionId) ?? Promise.resolve()).then(operation)
++    const settled = result.then(() => undefined, () => undefined)
++    this.lineageChains.set(sessionId, settled)
++    return result.finally(() => {
++      if (this.lineageChains.get(sessionId) === settled) this.lineageChains.delete(sessionId)
++    })
++  }
++
+   /**
+    * Read all visible Session rows without resuming an Agent.
+    * @param _request - reserved empty list request.
+@@ -441,15 +494,17 @@ export class SessionController extends TypertRemoteService {
+    */
+   @Remote('fork')
+   async fork(request: SessionForkRequest): Promise<SessionForkValue> {
+-    if (request.allowMigration === false && this.ctx.sessions.get(request.sessionId) === undefined) {
+-      const stored = await this.ctx.get('sessionPersistence')?.stat(request.sessionId)
+-      if (stored?.formatStatus === 'migration-required' && this.ctx.sessions.get(request.sessionId) === undefined) {
+-        throw new RemoteError('session/migration-required', 'Open the source Session to complete migration before forking', {
+-          sessionId: request.sessionId,
+-        })
++    return this.inLineage(request.sessionId, async () => {
++      if (request.allowMigration === false && this.ctx.sessions.get(request.sessionId) === undefined) {
++        const stored = await this.ctx.get('sessionPersistence')?.stat(request.sessionId)
++        if (stored?.formatStatus === 'migration-required' && this.ctx.sessions.get(request.sessionId) === undefined) {
++          throw new RemoteError('session/migration-required', 'Open the source Session to complete migration before forking', {
++            sessionId: request.sessionId,
++          })
++        }
+       }
+-    }
+-    return this.commands.fork(request)
++      return this.commands.fork(request)
++    })
+   }
+ 
+   /**
+diff --git a/packages/api/session-controller/src/lifecycle.ts b/packages/api/session-controller/src/lifecycle.ts
+new file mode 100644
+index 00000000..2e1bbac9
+--- /dev/null
++++ b/packages/api/session-controller/src/lifecycle.ts
+@@ -0,0 +1,203 @@
++/**
++ * Session lifecycle commands shared by the Host and the Bridge plugin:
++ * permanent deletion and moving a stored Session to another Workspace.
++ *
++ * Both operations are Host-owned transactions. The plugin calls
++ * `ctx.sessionController` and never touches a log, an index row, or workspace
++ * accounting itself. A running or already-open Session is refused: the writer
++ * lease is the Host's own exclusion and no supported path can relocate or
++ * remove a log while an Agent is executing against it.
++ *
++ * @module @deepseek-ai/dsh-api-session-controller/lifecycle
++ */
++
++import type { Context } from '@deepseek-ai/cordis'
++import type { ApiSessionAgentController } from './agent.ts'
++import type { SessionId } from '@deepseek-ai/dsh-session'
++import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
++import {
++  SessionAlreadyOwnedError,
++  SessionPersistenceChildExistsError,
++  SessionPersistenceDeleteUnsupportedError,
++  SessionPersistenceNotFoundError,
++} from '@deepseek-ai/dsh-session-persistence'
++import type {} from '@deepseek-ai/dsh-agent'
++import type {} from '@deepseek-ai/dsh-session-persistence'
++import type {} from '@deepseek-ai/dsh-session-query'
++import type {} from '@deepseek-ai/dsh-workspace'
++
++/** Stable refusal/failure codes the plugin route maps to HTTP statuses. */
++export type SessionLifecycleErrorCode =
++  | 'session/delete-active'
++  | 'session/delete-has-children'
++  | 'session/delete-not-archived'
++  | 'session/delete-not-found'
++  | 'session/delete-owned'
++  | 'session/delete-unsupported'
++  | 'session/move-active'
++  | 'session/move-busy'
++  | 'session/move-not-found'
++  | 'session/move-same-workspace'
++  | 'session/move-target-missing'
++  | 'session/move-unsupported'
++
++/** One typed lifecycle refusal carrying a stable wire code. */
++export class SessionLifecycleError extends Error {
++  /**
++   * @param code - stable code the client route reports.
++   * @param message - human-readable detail.
++   */
++  constructor(readonly code: SessionLifecycleErrorCode, message: string) {
++    super(message)
++    this.name = 'SessionLifecycleError'
++  }
++}
++
++/** Brand a raw workspace id without importing the registry at runtime. */
++function workspaceId(value: string): WorkspaceId {
++  return value as WorkspaceId
++}
++
++/**
++ * Host-owned Session deletion and move transactions.
++ *
++ * Installed once by {@link SessionController}; its methods are the optional
++ * `deleteSession`/`deleteArchivedSession`/`moveSession` surface the Session
++ * Bridge looks for with capability detection.
++ */
++export class SessionLifecycleController {
++  /**
++   * @param ctx - Host context that mounts the persistence, workspace, query and directory services.
++   * @param agents - the controller that owns the creation handles of idle Agents.
++   */
++  constructor(
++    private readonly ctx: Context,
++    private readonly agents: ApiSessionAgentController,
++  ) {}
++
++  /**
++   * Permanently delete one stored Session.
++   *
++   * Guards run before anything is written: an archived-only request must name
++   * an archived Session; a live Agent or attached Session is refused (its
++   * writer lease cannot be dropped safely); a running turn/job/subagent/
++   * schedule is refused through the Workspace registry's activity waterfall;
++   * and a Session with derived child Sessions is refused so its lineage is not
++   * orphaned. The persistence backend then performs the removal under its own
++   * single-writer claim, and the Workspace registry forgets the identity.
++   * @param sessionId - the stored Session to delete.
++   * @param options - whether an archived Session is required.
++   * @throws {SessionLifecycleError} for a stable refusal code.
++   */
++  async deleteSession(sessionId: SessionId, options: { readonly archivedOnly?: boolean } = {}): Promise<void> {
++    if (options.archivedOnly === true && !this.ctx.workspaceRegistry.archivedSessionIds.includes(sessionId)) {
++      throw new SessionLifecycleError('session/delete-not-archived',
++        `session '${sessionId}' is not archived; archive it before deleting`)
++    }
++    // A loaded but idle Agent holds the writer lease. The controller owns its
++    // disposal capability, so release exactly that Agent; a running Agent or an
++    // Agent owned by another component is refused.
++    const released = await this.agents.releaseIdle(sessionId)
++    if (released === 'running') {
++      throw new SessionLifecycleError('session/delete-active',
++        `session '${sessionId}' is running; stop it before deleting`)
++    }
++    if (released === 'unmanaged' || this.ctx.sessions.get(sessionId) !== undefined) {
++      throw new SessionLifecycleError('session/delete-owned',
++        `session '${sessionId}' is owned by another component; retry after it is released`)
++    }
++    const activity = await this.ctx.waterfall('workspace/session-activity', { sessionId }, () => Promise.resolve([]))
++    if (activity.length > 0) {
++      throw new SessionLifecycleError('session/delete-active',
++        `session '${sessionId}' still has active work (${activity.map(entry => entry.kind).join(', ')})`)
++    }
++    const observations = await this.ctx.sessionQuery.listSessions()
++    if (observations.some(observation => observation.header.parentSession === sessionId)) {
++      throw new SessionLifecycleError('session/delete-has-children',
++        `session '${sessionId}' has derived Sessions; delete those first`)
++    }
++    try {
++      await this.ctx.sessionPersistence.delete(sessionId)
++    } catch (error) {
++      if (error instanceof SessionPersistenceNotFoundError) {
++        // The idle Agent was legally released above and its blank Session
++        // never materialized a durable artifact (or another owner already
++        // committed the deletion). There is no log left to remove; release
++        // the workspace accounting below as the last observable state.
++      } else if (error instanceof SessionAlreadyOwnedError) {
++        throw new SessionLifecycleError('session/delete-owned',
++          `session '${sessionId}' is owned by another writer`)
++      } else if (error instanceof SessionPersistenceChildExistsError
++        || (error as { name?: unknown })?.name === 'SessionPersistenceChildExistsError') {
++        throw new SessionLifecycleError('session/delete-has-children',
++          `session '${sessionId}' has derived Sessions; delete those first`)
++      } else if (error instanceof SessionPersistenceDeleteUnsupportedError
++        || (error as { name?: unknown })?.name === 'SessionPersistenceDeleteUnsupportedError') {
++        throw new SessionLifecycleError('session/delete-unsupported',
++          'the mounted persistence backend has no deletion transaction')
++      } else {
++        throw error
++      }
++    }
++    try {
++      await this.ctx.workspaceRegistry.detachSession(sessionId)
++    } catch (error) {
++      // The authoritative log is gone; a failed accounting write must not turn
++      // a completed deletion into a reported failure. The registry filters
++      // unknown Sessions on its next header rebuild.
++      this.ctx.logger.warn(`session-controller: deleted '${sessionId}' but could not detach its workspace accounting: ${String(error)}`)
++    }
++  }
++
++  /**
++   * Permanently delete one *archived* Session (the legacy Host contract).
++   * @param sessionId - the archived Session to delete.
++   * @throws {SessionLifecycleError} `session/delete-not-archived` or a deletion refusal.
++   */
++  deleteArchivedSession(sessionId: SessionId): Promise<void> {
++    return this.deleteSession(sessionId, { archivedOnly: true })
++  }
++
++  /**
++   * Move one stored Session to another registered Workspace.
++   *
++   * The durable header keeps the original project: DSH's effective directory
++   * is a Session projection, so the registry's move journal first commits its
++   * intent, then appends the `working-directory/change` event and moves the
++   * Workspace accounting together under one recoverable marker. The Session
++   * id, event history, title, archive state and pin state are untouched. A
++   * running or open Session is refused.
++   * @param sessionId - the stored Session to move.
++   * @param targetWorkspaceId - registered Workspace identity to move to.
++   * @throws {SessionLifecycleError} for a stable refusal code.
++   */
++  async moveSession(sessionId: SessionId, targetWorkspaceId: string): Promise<void> {
++    const target = this.ctx.workspaceRegistry.get(workspaceId(targetWorkspaceId))
++    if (target === undefined) {
++      throw new SessionLifecycleError('session/move-target-missing', 'the target workspace no longer exists')
++    }
++    const released = await this.agents.releaseIdle(sessionId)
++    if (released === 'running') {
++      throw new SessionLifecycleError('session/move-active',
++        `session '${sessionId}' is running; stop it before moving`)
++    }
++    if (released === 'unmanaged' || this.ctx.sessions.get(sessionId) !== undefined) {
++      throw new SessionLifecycleError('session/move-busy',
++        `session '${sessionId}' is owned by another component; retry after it is released`)
++    }
++    const activity = await this.ctx.waterfall('workspace/session-activity', { sessionId }, () => Promise.resolve([]))
++    if (activity.length > 0) {
++      throw new SessionLifecycleError('session/move-active',
++        `session '${sessionId}' still has active work (${activity.map(entry => entry.kind).join(', ')})`)
++    }
++    if (await this.ctx.sessionPersistence.stat(sessionId) === undefined) {
++      throw new SessionLifecycleError('session/move-not-found', `session '${sessionId}' was not found`)
++    }
++    // The registry stages and finishes one move inside a single queued
++    // operation: the marker, the effective-directory event, and the
++    // membership/override commit cannot interleave with another workspace
++    // mutation, and a pending marker is completed by the queue before a new
++    // operation starts (never overwritten).
++    await this.ctx.workspaceRegistry.moveSession(sessionId, target.id)
++  }
++}
+diff --git a/packages/api/session-controller/tests/lifecycle.host.spec.ts b/packages/api/session-controller/tests/lifecycle.host.spec.ts
+new file mode 100644
+index 00000000..c8f4cc6e
+--- /dev/null
++++ b/packages/api/session-controller/tests/lifecycle.host.spec.ts
+@@ -0,0 +1,249 @@
++import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { Context } from '@deepseek-ai/cordis'
++import { afterEach, describe, expect, it } from 'vitest'
++import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
++import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
++import SessionQueryEngine from '@deepseek-ai/dsh-session-query'
++import Storage from '@deepseek-ai/dsh-storage'
++import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
++import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
++import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
++import { SessionId } from '@deepseek-ai/dsh-session'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
++import type {} from '@deepseek-ai/dsh-working-directory'
++import { ApiSessionAgentController } from '../src/agent.ts'
++import { installModelSelectionProjection } from '../src/model-selection-projection.ts'
++import { SessionLifecycleController } from '../src/lifecycle.ts'
++
++const contexts: Context[] = []
++const roots: string[] = []
++
++afterEach(async () => {
++  await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
++  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
++})
++
++interface Stack {
++  readonly ctx: Context
++  readonly root: string
++  readonly dirA: string
++  readonly dirB: string
++  readonly pool: MemoryMediaPool
++  readonly registry: Context['workspaceRegistry']
++  readonly persistence: Context['sessionPersistence']
++  readonly agents: ApiSessionAgentController
++  readonly lifecycle: SessionLifecycleController
++}
++
++/** Mount the real agent loop, real JSONL session store, and a durable workspace domain. */
++async function boot(root: string, pool: MemoryMediaPool): Promise<Stack> {
++  const dirA = join(root, 'project-a')
++  const dirB = join(root, 'project-b')
++  await mkdir(dirA, { recursive: true })
++  await mkdir(dirB, { recursive: true })
++  await mkdir(root, { recursive: true })
++  await writeFile(join(dirA, 'keep.txt'), 'keep')
++  await writeFile(join(dirB, 'keep.txt'), 'keep')
++  const ctx = new Context()
++  contexts.push(ctx)
++  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
++  installModelSelectionProjection(ctx)
++  await ctx.plugin(TypertRegistry)
++  await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
++  await ctx.plugin(SessionQueryEngine)
++  await ctx.plugin(Storage)
++  ctx.storage.backend.register('memory', new MemoryStorageBackend(pool))
++  const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
++  ctx.storage.mount('domain', facility)
++  ctx.provide('storageDomain', facility)
++  await ctx.plugin(WorkspaceRegistry)
++  ctx.provide('agentDefaultModel', {
++    currentSelection: () => ({ provider: 'fixture', model: 'fixture-model' }),
++    saveSelection: () => Promise.resolve(),
++  } as never)
++  await mountAgentLoopTestHarness(ctx)
++  const agents = new ApiSessionAgentController(ctx)
++  return {
++    ctx,
++    root,
++    dirA: await realpath(dirA),
++    dirB: await realpath(dirB),
++    pool,
++    registry: ctx.workspaceRegistry,
++    persistence: ctx.sessionPersistence,
++    agents,
++    lifecycle: new SessionLifecycleController(ctx, agents),
++  }
++}
++
++async function fixture(): Promise<Stack> {
++  const parent = await mkdtemp(join(tmpdir(), 'dsh-lifecycle-real-'))
++  roots.push(parent)
++  return await boot(join(parent, 'sessions'), new MemoryMediaPool())
++}
++
++/** Create one live, idle Agent through the controller and attach it to a real workspace. */
++async function idleSession(stack: Stack): Promise<{
++  id: SessionId
++  workspaceId: string
++  baseline: readonly SessionEvent[]
++}> {
++  const workspace = await stack.registry.create(stack.dirA)
++  const created = await stack.agents.createSession({ cwd: stack.dirA, reusable: () => true })
++  const agent = created.agent
++  agent.session.append('user/message', createUserMessage({
++    content: [{ type: 'text', text: 'original question before the move' }],
++    source: { kind: 'user' },
++  }), { surfaceOp: 'append' })
++  agent.session.append('user/message', createUserMessage({
++    content: [{ type: 'text', text: 'follow-up question before the move' }],
++    source: { kind: 'user' },
++  }), { surfaceOp: 'append' })
++  agent.session.append('session/title', {
++    title: 'Original moved title',
++    messageSeqs: [],
++    source: { kind: 'user' },
++  })
++  await stack.ctx.sessions.flush(agent.session)
++  await stack.persistence.flush()
++  await workspace.attachSession(agent.id)
++  expect(stack.ctx.agents.get(agent.id)?.status).toBe('idle')
++  const read = await stack.persistence.open(agent.id, 'read')
++  const baseline = (await read.read(0)).events
++  await read.close()
++  return { id: agent.id, workspaceId: String(workspace.id), baseline }
++}
++
++async function membership(stack: Stack, workspaceId: string): Promise<readonly string[]> {
++  return stack.registry.get(workspaceId as never)?.sessionIds.map(id => String(id)) ?? []
++}
++
++async function restart(stack: Stack): Promise<Stack> {
++  await stack.ctx.fiber.dispose()
++  const index = contexts.indexOf(stack.ctx)
++  if (index >= 0) contexts.splice(index, 1)
++  return await boot(stack.root, stack.pool)
++}
++
++describe('SessionLifecycleController with real storage and idle agents', () => {
++  it('releases a used-but-idle agent and permanently deletes its real log', async () => {
++    const stack = await fixture()
++    const { id, workspaceId } = await idleSession(stack)
++    expect(await stack.persistence.stat(id)).toBeDefined()
++    await stack.lifecycle.deleteSession(id)
++    expect(stack.ctx.agents.get(id)).toBeUndefined()
++    expect(await stack.persistence.stat(id)).toBeUndefined()
++    expect((await stack.persistence.list()).map(entry => String(entry.header.id))).not.toContain(String(id))
++    expect(await membership(stack, workspaceId)).not.toContain(String(id))
++    expect(await readFile(join(stack.dirA, 'keep.txt'), 'utf8')).toBe('keep')
++    const restarted = await restart(stack)
++    expect((await restarted.persistence.list()).map(entry => String(entry.header.id))).not.toContain(String(id))
++    expect(await membership(restarted, workspaceId)).not.toContain(String(id))
++  })
++
++  it('deletes an unmaterialized blank session after legally releasing it', async () => {
++    const stack = await fixture()
++    const workspace = await stack.registry.create(stack.dirA)
++    const created = await stack.agents.createSession({ cwd: stack.dirA, reusable: () => true })
++    await workspace.attachSession(created.agent.id)
++    expect(stack.ctx.agents.get(created.agent.id)?.status).toBe('idle')
++    expect((await stack.persistence.stat(created.agent.id))?.location).toBeUndefined()
++    await expect(stack.lifecycle.deleteSession(created.agent.id)).resolves.toBeUndefined()
++    expect(stack.ctx.agents.get(created.agent.id)).toBeUndefined()
++    expect(await stack.persistence.stat(created.agent.id)).toBeUndefined()
++    expect(await membership(stack, String(workspace.id))).not.toContain(String(created.agent.id))
++  })
++
++  it('moves a used-but-idle agent to another workspace with real log and effective directory', async () => {
++    const stack = await fixture()
++    const { id, workspaceId: sourceId, baseline } = await idleSession(stack)
++    const target = await stack.registry.create(stack.dirB)
++    await stack.lifecycle.moveSession(id, String(target.id))
++    expect(await membership(stack, sourceId)).not.toContain(String(id))
++    expect(await membership(stack, String(target.id))).toContain(String(id))
++    expect(await readFile(join(stack.dirA, 'keep.txt'), 'utf8')).toBe('keep')
++    expect(await readFile(join(stack.dirB, 'keep.txt'), 'utf8')).toBe('keep')
++    const read = await stack.persistence.open(id, 'read')
++    const events = (await read.read(0)).events
++    await read.close()
++    expect(events.length).toBe(baseline.length + 1)
++    expect(events.slice(0, baseline.length)).toEqual(baseline)
++    expect(events.filter((event: SessionEvent) => event.type === 'user/message')).toHaveLength(2)
++    expect(events.findLast((event: SessionEvent) => event.type === 'session/title')?.data)
++      .toMatchObject({ title: 'Original moved title' })
++    expect(events.filter((event: SessionEvent) => event.type === 'working-directory/change').at(-1)?.data)
++      .toEqual({ cwd: stack.dirB })
++    // Resume through the controller's own path: the effective directory is the target.
++    const resumed = await stack.agents.resolveAgent(id)
++    expect('agent' in resumed).toBe(true)
++    if ('agent' in resumed) {
++      expect(stack.ctx.workingDirectory.get(resumed.agent.session)).toBe(stack.dirB)
++    }
++    const restarted = await restart(stack)
++    const restartedTarget = restarted.registry.list().find(workspace => workspace.path === stack.dirB)
++    expect(restartedTarget?.sessionIds.map(value => String(value))).toContain(String(id))
++    const replay = await restarted.persistence.open(id, 'read')
++    const replayed = (await replay.read(0)).events
++    await replay.close()
++    expect(String(replay.header.id)).toBe(String(id))
++    expect(replayed.slice(0, baseline.length)).toEqual(baseline)
++    expect(replayed.findLast((event: SessionEvent) => event.type === 'session/title')?.data)
++      .toMatchObject({ title: 'Original moved title' })
++    expect(replayed.filter((event: SessionEvent) => event.type === 'working-directory/change').at(-1)?.data)
++      .toEqual({ cwd: stack.dirB })
++  })
++
++  it('moves two different real sessions through the shared queue', async () => {
++    const stack = await fixture()
++    const first = await idleSession(stack)
++    const second = await idleSession(stack)
++    const target = await stack.registry.create(stack.dirB)
++    await Promise.all([
++      stack.lifecycle.moveSession(first.id, String(target.id)),
++      stack.lifecycle.moveSession(second.id, String(target.id)),
++    ])
++    expect(await membership(stack, first.workspaceId)).not.toContain(String(first.id))
++    expect(await membership(stack, second.workspaceId)).not.toContain(String(second.id))
++    expect(await membership(stack, String(target.id))).toEqual(expect.arrayContaining([String(first.id), String(second.id)]))
++    for (const entry of [first, second]) {
++      const read = await stack.persistence.open(entry.id, 'read')
++      const events = (await read.read(0)).events
++      await read.close()
++      expect(events.filter((event: SessionEvent) => event.type === 'working-directory/change').at(-1)?.data)
++        .toEqual({ cwd: stack.dirB })
++      expect(events.slice(0, entry.baseline.length)).toEqual(entry.baseline)
++    }
++  })
++
++  it('refuses an externally owned session and a running agent', async () => {
++    const stack = await fixture()
++    const foreignHeader = {
++      version: 4,
++      id: SessionId('session-foreign-owner'),
++      createdAt: 1,
++      isSeeded: false,
++      cwd: stack.dirA,
++    }
++    const foreign = await stack.persistence.create(foreignHeader, { inheritedEventCount: 0 as never })
++    await foreign.append([{ type: 'working-directory/change', seq: 0 as never, time: 1, data: { cwd: stack.dirA } } as never])
++    await foreign.close()
++    const writer = await stack.persistence.open(SessionId('session-foreign-owner'), 'write')
++    try {
++      await expect(stack.lifecycle.deleteSession(SessionId('session-foreign-owner')))
++        .rejects.toMatchObject({ code: 'session/delete-owned' })
++    } finally {
++      await writer.close()
++    }
++    const second = await idleSession(stack)
++    const agent = stack.ctx.agents.get(second.id)
++    if (agent === undefined) throw new Error('expected a live agent')
++    Object.defineProperty(agent, 'status', { configurable: true, value: 'running' })
++    const target = await stack.registry.create(stack.dirB)
++    await expect(stack.lifecycle.moveSession(second.id, String(target.id)))
++      .rejects.toMatchObject({ code: 'session/move-active' })
++  })
++})
+diff --git a/packages/api/session-controller/tsconfig.host.json b/packages/api/session-controller/tsconfig.host.json
+index 8f90ca7a..4384ca09 100644
+--- a/packages/api/session-controller/tsconfig.host.json
++++ b/packages/api/session-controller/tsconfig.host.json
+@@ -20,7 +20,8 @@
+     "src/media-references.ts",
+     "src/model-selection-projection.ts",
+     "src/archived-session-gate.ts",
+-    "src/skill-catalog.ts"
++    "src/skill-catalog.ts",
++    "src/lifecycle.ts"
+   ],
+   "references": [
+     {
+diff --git a/packages/session/session-persistence-jsonl/src/index.ts b/packages/session/session-persistence-jsonl/src/index.ts
+index 3c3c1358..af2e5dbb 100644
+--- a/packages/session/session-persistence-jsonl/src/index.ts
++++ b/packages/session/session-persistence-jsonl/src/index.ts
+@@ -14,7 +14,7 @@ import {
+   sessionFormatCatalog,
+ } from '@deepseek-ai/dsh-session-format-catalog'
+ import { readdirSync, type Dirent } from 'node:fs'
+-import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
++import { open, mkdir, readdir, realpath, link, rename, rm, stat, truncate } from 'node:fs/promises'
+ import { dirname, join, resolve } from 'node:path'
+ import { performance } from 'node:perf_hooks'
+ import { scheduler } from 'node:timers/promises'
+@@ -23,12 +23,12 @@ import pLimit, { type LimitFunction } from 'p-limit'
+ import {
+   SessionPersistence, SessionPersistenceRevision, SessionFormatUnsupportedError,
+   SessionPersistenceCorruptionError,
+-  SessionAlreadyExistsError, SessionPersistenceNotFoundError,
++  SessionAlreadyExistsError, SessionPersistenceChildExistsError, SessionPersistenceNotFoundError,
+   assertStoredId, materializeCreateHeader, sessionFormatVersionRefusal, validateStoredEvents,
+   type SessionAccess, type SessionHandle,
+   type SessionHandleReadResult,
+   type SessionLocation, type SessionPersistenceCreateOptions,
+-  type SessionPersistenceListOptions, type SessionPersistenceOpenOptions,
++  type SessionPersistenceDeleteOptions, type SessionPersistenceListOptions, type SessionPersistenceOpenOptions,
+   type SessionPersistenceSnapshot, type SessionPersistenceStatOptions,
+   type SessionPersistenceRevision as PersistenceRevision,
+ } from '@deepseek-ai/dsh-session-persistence'
+@@ -59,6 +59,11 @@ import {
+ 
+ export type { JsonlCompression } from './format.ts'
+ 
++/** Per-Session lineage lock shared by child creation and permanent deletion. */
++const LIFECYCLE_LOCK_FILENAME = 'session.lifecycle.lock'
++/** Durable deletion tombstone; a Session directory carrying it is not observable. */
++const DELETION_TOMBSTONE_FILENAME = 'session.deleted'
++
+ /**
+  * Internal handoff-reuse policy, not deployment configuration: a cold
+  * observation and the resume that immediately follows it reuse one parsed
+@@ -370,12 +375,46 @@ class JsonlSessionPersistence extends SessionPersistence {
+       throw new SessionAlreadyExistsError(snapshot.id)
+     }
+     options?.signal?.throwIfAborted()
+-    // No lock yet: before materialization there is no durable artifact for
+-    // another process to contend over, so the handle acquires the lock right
+-    // before its first log bytes publish (ensureLease); an unmaterialized
+-    // session leaves no filesystem footprint at all.
+-    this.tracker.registerCreated(snapshot, inheritedEventCount)
+-    return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }))
++    // A reused identity may still carry the previous deletion's tombstone;
++    // clear it (and any orphan generation kept by an interrupted deletion)
++    // before this Session publishes its own artifact.
++    await this.clearDeletionTombstone(sessionDir(this.root, snapshot.cwd, snapshot.id), options?.signal)
++    // Derived Sessions are authorized at the authoritative create boundary:
++    // the parent lineage lock is held while the parent is proven alive and
++    // this child materializes. A concurrent parent deletion therefore either
++    // observes this child and refuses, or wins first and this create fails.
++    let parentLease: SessionWriteLease | undefined
++    const parentId = snapshot.parentSession
++    if (parentId !== undefined) {
++      const parent = await this.findLog(parentId, options?.signal)
++      if (parent === undefined) throw new SessionPersistenceNotFoundError(parentId)
++      parentLease = await SessionWriteLease.acquire(dirname(parent.sourcePath), parentId, LIFECYCLE_LOCK_FILENAME)
++      try {
++        if (await this.findLog(parentId, options?.signal) === undefined) throw new SessionPersistenceNotFoundError(parentId)
++      } catch (error) {
++        await parentLease.release().catch(() => {})
++        throw error
++      }
++    }
++    try {
++      // No lock yet: before materialization there is no durable artifact for
++      // another process to contend over, so the handle acquires the lock right
++      // before its first log bytes publish (ensureLease); an unmaterialized
++      // session leaves no filesystem footprint at all.
++      this.tracker.registerCreated(snapshot, inheritedEventCount)
++      const adopted = this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }))
++      if (parentLease !== undefined) {
++        // Materialize the child header before releasing the parent's lineage
++        // lock: the parent deletion check must be able to see this child.
++        await adopted.flush()
++        await parentLease.release()
++        parentLease = undefined
++      }
++      return adopted
++    } catch (error) {
++      await parentLease?.release().catch(() => {})
++      throw error
++    }
+   }
+ 
+   /**
+@@ -464,6 +503,94 @@ class JsonlSessionPersistence extends SessionPersistence {
+     }
+   }
+ 
++  /**
++   * Permanently delete one stored session under the backend's own single-writer
++   * ownership.
++   *
++   * `open('write')` performs the exact claim and kernel lease every append
++   * path uses; while it is held no other writer, in this process or another,
++   * can reach the artifact. The removal then unlinks this Session's canonical
++   * generation files and invalidates the parsed-log cache. The kernel lock
++   * file is deliberately left in place: the lease contract never removes it
++   * (a fresh inode would let another process take an independent lock while a
++   * holder still believes it owns the session), and a directory with no
++   * canonical generation is not observable as a Session. The handle is closed
++   * in `finally`, which releases the claim even when a filesystem step rejects.
++   * @param id - the stored session to delete.
++   * @param options - optional cancellation observed between filesystem steps.
++   * @throws {SessionPersistenceNotFoundError} when no generation exists.
++   * @throws {SessionAlreadyOwnedError} when a writer already owns the session.
++   */
++  override async delete(id: SessionId, options?: SessionPersistenceDeleteOptions): Promise<void> {
++    const signal = options?.signal
++    await this.ensureRootEncoding()
++    const resolved = await this.findLog(id, signal)
++    if (resolved === undefined) throw new SessionPersistenceNotFoundError(id)
++    const dir = dirname(resolved.currentPath)
++    // The lineage lock is disjoint from the writer lease. Child creation holds
++    // the parent's copy until the child header is durable, so exactly one of a
++    // child commit and this deletion commits first.
++    const lifecycle = await SessionWriteLease.acquire(dir, id, LIFECYCLE_LOCK_FILENAME)
++    try {
++      if (await this.findLog(id, signal) === undefined) throw new SessionPersistenceNotFoundError(id)
++      const artifacts = await this.listArtifacts(signal)
++      if (artifacts.some(artifact => artifact.header.parentSession === id)) {
++        throw new SessionPersistenceChildExistsError(id)
++      }
++      const handle = await this.open(id, 'write', options)
++      try {
++        // Commit the deletion intent durably before unlinking anything. From
++        // this point the Session is unobservable even if the process dies
++        // between generation removals; leftover artifacts are hidden by the
++        // tombstone instead of resurfacing as a partial older Session.
++        await this.writeDeletionTombstone(dir, id)
++        const entries = await readdir(dir)
++        for (const name of entries) {
++          if (parseGenerationLogFilename(name, this.compression) === undefined
++            && parseGenerationLogFilename(name, this.oppositeCompression()) === undefined) continue
++          await rm(join(dir, name), { force: true })
++        }
++        this.coldLogMemo.delete(id)
++      } finally {
++        await handle.close()
++      }
++    } finally {
++      await lifecycle.release()
++    }
++  }
++
++  /** Clear a prior deletion tombstone and any orphan generation for a reused id. */
++  private async clearDeletionTombstone(dir: string, signal?: AbortSignal): Promise<void> {
++    let entries: string[]
++    try {
++      entries = await readdir(dir)
++    } catch (error: unknown) {
++      if (isENOENT(error)) return
++      throw error
++    }
++    if (!entries.includes(DELETION_TOMBSTONE_FILENAME)) return
++    signal?.throwIfAborted()
++    for (const name of entries) {
++      if (name !== DELETION_TOMBSTONE_FILENAME
++        && parseGenerationLogFilename(name, this.compression) === undefined
++        && parseGenerationLogFilename(name, this.oppositeCompression()) === undefined) continue
++      await rm(join(dir, name), { force: true })
++    }
++  }
++
++  /** Persist the deletion intent atomically inside the Session's own directory. */
++  private async writeDeletionTombstone(dir: string, id: SessionId): Promise<void> {
++    const temporary = join(dir, `${DELETION_TOMBSTONE_FILENAME}.${process.pid}.${randomBytes(6).toString('hex')}`)
++    const handle = await open(temporary, 'w')
++    try {
++      await handle.writeFile(JSON.stringify({ sessionId: id, deletedAt: new Date().toISOString() }))
++      await handle.sync()
++    } finally {
++      await handle.close()
++    }
++    await rename(temporary, join(dir, DELETION_TOMBSTONE_FILENAME))
++  }
++
+   /**
+    * Flush every active write handle in one durability barrier; see the seam
+    * contract.
+@@ -1544,6 +1671,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+       throw error
+     }
+     signal?.throwIfAborted()
++    if (entries.some(entry => entry.name === DELETION_TOMBSTONE_FILENAME)) return undefined
+     const generations: Array<{ readonly path: string; readonly version: number }> = []
+     const opposite: string[] = []
+     for (const entry of entries) {
+diff --git a/packages/session/session-persistence-jsonl/src/lease.ts b/packages/session/session-persistence-jsonl/src/lease.ts
+index 59dfe27f..1ad493f5 100644
+--- a/packages/session/session-persistence-jsonl/src/lease.ts
++++ b/packages/session/session-persistence-jsonl/src/lease.ts
+@@ -64,11 +64,13 @@ export class SessionWriteLease {
+    * Acquire the session directory's kernel write lock.
+    * @param dir - the session's artifact directory (created if absent).
+    * @param id - the session the lock guards, for error identities.
++   * @param filename - lock file name; the writer lease and the lineage lifecycle
++   *   lock use separate stable files so one never changes the other's semantics.
+    * @returns the held lock.
+    * @throws {SessionAlreadyOwnedError} while another holder keeps the lock.
+    */
+-  static async acquire(dir: string, id: SessionId): Promise<SessionWriteLease> {
+-    const path = join(dir, LEASE_FILENAME)
++  static async acquire(dir: string, id: SessionId, filename: string = LEASE_FILENAME): Promise<SessionWriteLease> {
++    const path = join(dir, filename)
+     // Owner-only like materializePosix's directories: the lock may create the
+     // session directory first, and both creators must agree on the mode.
+     await mkdir(dir, { recursive: true, mode: 0o700 })
+diff --git a/packages/session/session-persistence-jsonl/tests/delete.spec.ts b/packages/session/session-persistence-jsonl/tests/delete.spec.ts
+new file mode 100644
+index 00000000..1ddb2e8e
+--- /dev/null
++++ b/packages/session/session-persistence-jsonl/tests/delete.spec.ts
+@@ -0,0 +1,102 @@
++import { mkdtemp, readdir, rm } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { Context } from '@deepseek-ai/cordis'
++import { afterEach, describe, expect, it } from 'vitest'
++import { SessionId } from '@deepseek-ai/dsh-session'
++import { SessionAlreadyOwnedError, SessionPersistenceChildExistsError } from '@deepseek-ai/dsh-session-persistence'
++import * as JsonlSessionPersistence from '../src/index.ts'
++import { sessionDir } from '../src/format.ts'
++import { meta, oneTurnLog } from '../../session-persistence/tests/contract.ts'
++
++const roots: string[] = []
++
++async function mount(): Promise<{
++  persistence: Context['sessionPersistence']
++  root: string
++  dispose: () => Promise<void>
++}> {
++  const root = await mkdtemp(join(tmpdir(), 'dsh-jsonl-delete-'))
++  roots.push(root)
++  const ctx = new Context()
++  const fiber = await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
++  return {
++    persistence: ctx.sessionPersistence,
++    root,
++    dispose: async () => {
++      await fiber.dispose()
++      await rm(root, { recursive: true, force: true })
++    },
++  }
++}
++
++async function store(persistence: Context['sessionPersistence'], id: string, parentSession?: string): Promise<void> {
++  const header = {
++    ...meta(id, '/tmp/project'),
++    ...(parentSession === undefined ? {} : { parentSession: SessionId(parentSession) }),
++  }
++  const handle = await persistence.create(header)
++  await handle.append(oneTurnLog())
++  await handle.close()
++}
++
++afterEach(async () => {
++  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
++})
++
++describe('JsonlSessionPersistence deletion transaction', () => {
++  it('removes a stored session, keeps a tombstone, and lets the same identity be created again', async () => {
++    const { persistence, root, dispose } = await mount()
++    try {
++      await store(persistence, 'deletable')
++      expect(await persistence.stat(SessionId('deletable'))).toBeDefined()
++      await persistence.delete(SessionId('deletable'))
++      expect(await persistence.stat(SessionId('deletable'))).toBeUndefined()
++      expect(await persistence.list()).toEqual([])
++      const dir = sessionDir(root, '/tmp/project', SessionId('deletable'))
++      const entries = await readdir(dir)
++      expect(entries).toContain('session.deleted')
++      expect(entries.some(name => name.startsWith('session.v') || name === 'session.jsonl')).toBe(false)
++      // A reused identity must clear the marker instead of inheriting a hidden Session.
++      await store(persistence, 'deletable')
++      expect(await persistence.stat(SessionId('deletable'))).toBeDefined()
++      expect(await readdir(dir)).not.toContain('session.deleted')
++    } finally {
++      await dispose()
++    }
++  })
++
++  it('refuses while a derived child session exists and deletes parent after the child', async () => {
++    const { persistence, dispose } = await mount()
++    try {
++      await store(persistence, 'parent')
++      await store(persistence, 'child', 'parent')
++      await expect(persistence.delete(SessionId('parent'))).rejects.toBeInstanceOf(SessionPersistenceChildExistsError)
++      expect(await persistence.stat(SessionId('parent'))).toBeDefined()
++      await persistence.delete(SessionId('child'))
++      await persistence.delete(SessionId('parent'))
++      expect(await persistence.list()).toEqual([])
++    } finally {
++      await dispose()
++    }
++  })
++
++  it('refuses while another writer owns the session', async () => {
++    const { persistence, dispose } = await mount()
++    try {
++      await store(persistence, 'busy')
++      const reader = await persistence.open(SessionId('busy'), 'read')
++      const writer = await persistence.open(SessionId('busy'), 'write')
++      try {
++        await expect(persistence.delete(SessionId('busy'))).rejects.toBeInstanceOf(SessionAlreadyOwnedError)
++      } finally {
++        await writer.close()
++        await reader.close()
++      }
++      await persistence.delete(SessionId('busy'))
++      expect(await persistence.stat(SessionId('busy'))).toBeUndefined()
++    } finally {
++      await dispose()
++    }
++  })
++})
+diff --git a/packages/session/session-persistence/src/index.ts b/packages/session/session-persistence/src/index.ts
+index f257ca0e..9d4a5fd4 100644
+--- a/packages/session/session-persistence/src/index.ts
++++ b/packages/session/session-persistence/src/index.ts
+@@ -108,6 +108,28 @@ export interface SessionPersistenceListOptions {
+   readonly signal?: AbortSignal
+ }
+ 
++/** Options for {@link SessionPersistence.delete}. */
++export interface SessionPersistenceDeleteOptions {
++  /** Optional cancellation observed before backend work starts. */
++  readonly signal?: AbortSignal
++}
++
++/** A deletion was refused because a derived child Session already exists. */
++export class SessionPersistenceChildExistsError extends Error {
++  constructor(readonly sessionId: SessionId) {
++    super(`session "${sessionId}" still has derived Sessions`)
++    this.name = 'SessionPersistenceChildExistsError'
++  }
++}
++
++/** A backend that stores Sessions but does not implement permanent deletion. */
++export class SessionPersistenceDeleteUnsupportedError extends Error {
++  constructor() {
++    super('session persistence backend does not implement deletion')
++    this.name = 'SessionPersistenceDeleteUnsupportedError'
++  }
++}
++
+ declare module '@deepseek-ai/cordis' {
+   interface Context {
+     sessionPersistence: SessionPersistence
+@@ -179,6 +201,23 @@ export abstract class SessionPersistence extends Service {
+    */
+   abstract flush(): Promise<void>
+ 
++  /**
++   * Permanently delete one stored session.
++   *
++   * The backend holds the same single-writer ownership a `write` open takes
++   * for the whole removal, so no in-process or cross-process writer can append
++   * between the claim and the unlink. Backends that cannot provide this
++   * transaction throw {@link SessionPersistenceDeleteUnsupportedError}.
++   * @param id - the stored session to delete.
++   * @param options - optional cancellation observed before backend work starts.
++   * @throws {SessionPersistenceNotFoundError} when the session does not exist.
++   * @throws {SessionAlreadyOwnedError} when any writer already owns it.
++   * @throws {SessionPersistenceDeleteUnsupportedError} when this backend has no deletion transaction.
++   */
++  async delete(_id: SessionId, _options?: SessionPersistenceDeleteOptions): Promise<void> {
++    throw new SessionPersistenceDeleteUnsupportedError()
++  }
++
+   /**
+    * Observe one stored session without reading its event log or taking
+    * ownership.
+diff --git a/packages/workspace/workspace/src/index.ts b/packages/workspace/workspace/src/index.ts
+index 0f630500..ee616483 100644
+--- a/packages/workspace/workspace/src/index.ts
++++ b/packages/workspace/workspace/src/index.ts
+@@ -8,7 +8,8 @@
+ import { randomUUID } from 'node:crypto'
+ import { mkdir, stat } from 'node:fs/promises'
+ import { Context, Service } from '@deepseek-ai/cordis'
+-import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
++import { SessionSeq } from '@deepseek-ai/dsh-session'
++import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+ import type {} from '@deepseek-ai/dsh-session-persistence'
+ import type { DomainGlobal, KvTable } from '@deepseek-ai/dsh-storage-domain'
+ import { WorkspaceEntity } from './entity.ts'
+@@ -49,7 +50,7 @@ export class WorkspaceUnknownSessionError extends Error {
+    * @param sessionId - The unknown session id.
+    * @param verb - The registry operation that named the session.
+    */
+-  constructor(readonly sessionId: SessionId, verb: 'archive' | 'pin') {
++  constructor(readonly sessionId: SessionId, verb: 'archive' | 'pin' | 'move') {
+     super(`cannot ${verb} session '${sessionId}': live sessions and session persistence hold no such session`)
+     this.name = 'WorkspaceUnknownSessionError'
+   }
+@@ -93,6 +94,17 @@ export class WorkspaceOrderInvalidError extends Error {
+   }
+ }
+ 
++/** A move named a target workspace absent from the durable registry. */
++export class WorkspaceNotFoundError extends Error {
++  /**
++   * @param workspaceId - The missing workspace id.
++   */
++  constructor(readonly workspaceId: WorkspaceId) {
++    super(`workspace '${workspaceId}' does not exist`)
++    this.name = 'WorkspaceNotFoundError'
++  }
++}
++
+ 
+ /** The session an archive request is about to write into the archive set. */
+ export interface SessionActivityRequest {
+@@ -178,11 +190,21 @@ export class WorkspaceRegistry extends Service {
+   private readonly sessionPaths = new Map<SessionId, string>()
+   private readonly missingSessionPaths = new Set<SessionId>()
+   private readonly invalidSessionPaths = new Map<SessionId, string>()
++  /**
++   * Explicit durable moves: a Session whose effective Workspace is not the one
++   * its immutable header cwd names. Mirrors `state.sessionWorkspaceOverrides`
++   * so membership filters do not need a state read.
++   */
++  private readonly sessionOverrides = new Map<SessionId, WorkspaceId>()
+   private operationTail: Promise<void> = Promise.resolve()
+ 
+   private readonly host: WorkspaceEntityHost = {
+     table: () => this.requireTable(),
+-    candidateMatches: (id, path) => this.sessionPaths.get(id) === path || this.missingSessionPaths.has(id),
++    candidateMatches: (id, path) => {
++      const override = this.sessionOverrides.get(id)
++      if (override !== undefined) return this.requireTable().get(override)?.path === path
++      return this.sessionPaths.get(id) === path || this.missingSessionPaths.has(id)
++    },
+     readSessionHeader: id => this.readSessionHeader(id),
+     rememberSessionPath: (id, path) => {
+       this.sessionPaths.set(id, path)
+@@ -202,6 +224,7 @@ export class WorkspaceRegistry extends Service {
+     this.table = domain.table('workspaces')
+     this.global = domain.global
+     this.state = domain.global.get()
++    this.indexOverrides(this.state)
+ 
+     await this.recoverPendingMutation()
+     this.validateStoredState(this.state)
+@@ -409,6 +432,216 @@ export class WorkspaceRegistry extends Service {
+     })
+   }
+ 
++  /**
++   * Move one Session's durable workspace ownership to another registered
++   * Workspace without touching its immutable header.
++   *
++   * The target record receives the membership slot; the previous record (if
++   * any) loses it, and a durable override records that this Session's
++   * effective Workspace differs from its header cwd. The override survives
++   * restarts and is what the membership filter consults, so the moved Session
++   * stays grouped under the target even though its log header still names the
++   * original project. The Session must exist (live or persisted); archive and
++   * pin state are untouched.
++   * @param sessionId - The Session to move.
++   * @param targetWorkspaceId - Registered Workspace that will own it.
++   * @returns resolution after both records and the override are durable.
++   */
++  beginSessionMove(sessionId: SessionId, targetWorkspaceId: WorkspaceId): Promise<void> {
++    return this.enqueueOperation(async () => {
++      const state = this.requireState()
++      if (state.pendingMutation !== undefined) {
++        throw new Error(`workspace domain still has a pending ${state.pendingMutation.operation} mutation; recovery must complete it first`)
++      }
++      const table = this.requireTable()
++      const target = table.get(targetWorkspaceId)
++      if (target === undefined) throw new WorkspaceNotFoundError(targetWorkspaceId)
++      if (!(await this.sessionKnown(sessionId))) throw new WorkspaceUnknownSessionError(sessionId, 'move')
++      let sourceId: WorkspaceId | undefined
++      for (const [id, record] of table.entries()) {
++        if (record.sessionIds.includes(sessionId)) {
++          sourceId = id
++          break
++        }
++      }
++      if (sourceId === targetWorkspaceId) return
++      await this.setState({
++        ...state,
++        pendingMutation: {
++          operation: 'moveSession',
++          sessionId,
++          fromWorkspaceId: sourceId,
++          toWorkspaceId: targetWorkspaceId,
++          targetCwd: target.path,
++        },
++      })
++    })
++  }
++
++  /**
++   * Complete a move staged by {@link beginSessionMove}: append the effective
++   * working-directory event, move the current accounting membership, install
++   * the override, and clear the marker. Idempotent; a missing marker resolves
++   * without writing.
++   * @param sessionId - the Session being moved.
++   * @returns resolution after the directory event and membership are durable.
++   */
++  completeSessionMove(sessionId: SessionId): Promise<void> {
++    return this.enqueueOperation(async () => {
++      const pending = this.requireState().pendingMutation
++      if (pending === undefined) return
++      if (pending.operation !== 'moveSession' || pending.sessionId !== sessionId) {
++        throw new Error(
++          `workspace domain has a pending ${pending.operation} mutation for another target; `
++          + `session '${sessionId}' cannot complete over it`,
++        )
++      }
++      await this.finishSessionMove(pending)
++    })
++  }
++
++  /**
++   * Stage and finish one Session move inside a single registry queue slot.
++   *
++   * The queue's pre-step recovery completes any earlier pending marker before
++   * this operation starts, so a second move can never overwrite the first.
++   * Once this operation stages its marker, only it may finish it: no other
++   * workspace mutation can interleave between staging and completion.
++   * @param sessionId - the Session to move.
++   * @param targetWorkspaceId - registered Workspace that will own it.
++   * @returns resolution after the directory event and membership are durable.
++   */
++  moveSession(sessionId: SessionId, targetWorkspaceId: WorkspaceId): Promise<void> {
++    return this.enqueueOperation(async () => {
++      const state = this.requireState()
++      if (state.pendingMutation !== undefined) {
++        throw new Error(`workspace domain still has a pending ${state.pendingMutation.operation} mutation; recovery must complete it first`)
++      }
++      const table = this.requireTable()
++      const target = table.get(targetWorkspaceId)
++      if (target === undefined) throw new WorkspaceNotFoundError(targetWorkspaceId)
++      if (!(await this.sessionKnown(sessionId))) throw new WorkspaceUnknownSessionError(sessionId, 'move')
++      let sourceId: WorkspaceId | undefined
++      for (const [id, record] of table.entries()) {
++        if (record.sessionIds.includes(sessionId)) {
++          sourceId = id
++          break
++        }
++      }
++      if (sourceId === targetWorkspaceId) return
++      const marker = {
++        operation: 'moveSession' as const,
++        sessionId,
++        fromWorkspaceId: sourceId,
++        toWorkspaceId: targetWorkspaceId,
++        targetCwd: target.path,
++      }
++      await this.setState({ ...state, pendingMutation: marker })
++      try {
++        await this.finishSessionMove(marker)
++      } catch (error) {
++        try {
++          await this.finishSessionMove(marker)
++        } catch (recoveryError) {
++          throw new AggregateError(
++            [error, recoveryError],
++            `session '${sessionId}' move is staged but not completed; its marker remains for the next queued recovery`,
++          )
++        }
++      }
++    })
++  }
++
++  /** Convenience wrapper; one queued stage+finish operation. */
++  relocateSession(sessionId: SessionId, targetWorkspaceId: WorkspaceId): Promise<void> {
++    return this.moveSession(sessionId, targetWorkspaceId)
++  }
++
++  private async finishSessionMove(
++    marker: { readonly sessionId: SessionId; readonly toWorkspaceId: WorkspaceId; readonly targetCwd: string },
++  ): Promise<void> {
++    const target = this.requireTable().get(marker.toWorkspaceId)
++    if (target === undefined) throw new WorkspaceNotFoundError(marker.toWorkspaceId)
++    await this.ensureSessionWorkingDirectory(marker.sessionId, target.path)
++    await this.applySessionMove(marker.sessionId, marker.toWorkspaceId)
++    await this.setState({
++      ...this.requireState(),
++      pendingMutation: undefined,
++      sessionWorkspaceOverrides: this.overrideList(),
++    })
++  }
++
++  /**
++   * Commit the moved Session's effective directory. The immutable header
++   * cannot change, so recovery and completion both append the same durable
++   * `working-directory/change` event the working-directory owner would. The
++   * append is a no-op when the projection already names the target.
++   */
++  private async ensureSessionWorkingDirectory(sessionId: SessionId, cwd: string): Promise<void> {
++    const handle = await this.ctx.sessionPersistence.open(sessionId, 'write')
++    try {
++      const read = await handle.read(0)
++      const changed = (read.events as readonly { readonly type: string; readonly data?: { readonly cwd?: string } }[])
++        .findLast(event => event.type === 'working-directory/change')
++      const current = changed === undefined ? handle.header.cwd : changed.data?.cwd
++      if (current === cwd) return
++      const event = {
++        type: 'working-directory/change',
++        seq: SessionSeq(read.events.length),
++        time: Date.now(),
++        data: { cwd },
++      } as unknown as SessionEvent
++      await handle.append([event])
++    } finally {
++      await handle.close()
++    }
++  }
++
++  /**
++   * Drop a Session from every durable workspace surface: record accounting,
++   * the archive set, the pin set, and any explicit move override. Idempotent;
++   * used by the Host's permanent-deletion transaction after the log is gone.
++   * @param sessionId - The Session identity to forget.
++   * @returns resolution after every affected record and the global state are durable.
++   */
++  detachSession(sessionId: SessionId): Promise<void> {
++    return this.enqueueOperation(async () => {
++      const state = this.requireState()
++      let accounted = false
++      for (const [, record] of this.requireTable().entries()) {
++        if (record.sessionIds.includes(sessionId)) {
++          accounted = true
++          break
++        }
++      }
++      const known = accounted || this.sessionOverrides.has(sessionId)
++        || state.archivedSessionIds.includes(sessionId)
++        || state.pinnedSessionIds.includes(sessionId)
++      if (!known) return
++      await this.setState({ ...state, pendingMutation: { operation: 'detachSession', sessionId } })
++      try {
++        await this.applySessionDetach(sessionId)
++      } catch (error) {
++        try {
++          await this.recoverPendingMutation()
++          return
++        } catch (recoveryError) {
++          throw new AggregateError(
++            [error, recoveryError],
++            `session '${sessionId}' detach failed and its pending marker could not be completed`,
++          )
++        }
++      }
++      await this.setState({
++        ...this.requireState(),
++        pendingMutation: undefined,
++        archivedSessionIds: this.requireState().archivedSessionIds.filter(id => id !== sessionId),
++        pinnedSessionIds: this.requireState().pinnedSessionIds.filter(id => id !== sessionId),
++        sessionWorkspaceOverrides: this.overrideList(),
++      })
++    })
++  }
++
+   /**
+    * The registry-global pin set: sessions surfaced ahead of every unpinned
+    * session on grouping surfaces. Pinning never touches workspace accounting.
+@@ -633,10 +866,33 @@ export class WorkspaceRegistry extends Service {
+    * order/table divergence still reaches {@link validateStoredState} and
+    * fails loud; this path never guesses which operation created a row from its shape alone.
+    */
++  /**
++   * Complete the one mutation explicitly named by durable state.
++   *
++   * Session moves and detaches stage a marker before touching records, so a
++   * failure or process death at any point is completed from the marker instead
++   * of leaving an override/record disagreement for {@link validateStoredState}
++   * to reject. Workspace create/delete markers keep their original recovery.
++   */
+   private async recoverPendingMutation(): Promise<void> {
+     const state = this.requireState()
+     const pending = state.pendingMutation
+     if (pending === undefined) return
++    if (pending.operation === 'moveSession') {
++      await this.finishSessionMove(pending)
++      return
++    }
++    if (pending.operation === 'detachSession') {
++      await this.applySessionDetach(pending.sessionId)
++      await this.setState({
++        ...this.requireState(),
++        pendingMutation: undefined,
++        archivedSessionIds: this.requireState().archivedSessionIds.filter(id => id !== pending.sessionId),
++        pinnedSessionIds: this.requireState().pinnedSessionIds.filter(id => id !== pending.sessionId),
++        sessionWorkspaceOverrides: this.overrideList(),
++      })
++      return
++    }
+     if (state.workspaceIds.includes(pending.workspaceId)) {
+       throw new Error(
+         `workspace domain is inconsistent: pending ${pending.operation} workspace `
+@@ -647,11 +903,44 @@ export class WorkspaceRegistry extends Service {
+     await this.setState({ ...state, pendingMutation: undefined })
+   }
+ 
++  /** Apply the record/override half of a staged Session move (idempotent). */
++  private async applySessionMove(sessionId: SessionId, targetWorkspaceId: WorkspaceId): Promise<void> {
++    const table = this.requireTable()
++    if (table.get(targetWorkspaceId) === undefined) throw new WorkspaceNotFoundError(targetWorkspaceId)
++    const updatedAt = new Date().toISOString()
++    for (const [id, record] of table.entries()) {
++      if (id === targetWorkspaceId || !record.sessionIds.includes(sessionId)) continue
++      await table.update(id, current => current.sessionIds.includes(sessionId)
++        ? { ...current, sessionIds: current.sessionIds.filter(value => value !== sessionId), updatedAt }
++        : current)
++    }
++    await table.update(targetWorkspaceId, record => record.sessionIds.includes(sessionId)
++      ? record
++      : { ...record, sessionIds: [sessionId, ...record.sessionIds], updatedAt })
++    this.sessionOverrides.set(sessionId, targetWorkspaceId)
++    this.rebuildEntities()
++  }
++
++  /** Apply the record/override half of a staged Session detach (idempotent). */
++  private async applySessionDetach(sessionId: SessionId): Promise<void> {
++    const table = this.requireTable()
++    const updatedAt = new Date().toISOString()
++    for (const [id, record] of table.entries()) {
++      if (!record.sessionIds.includes(sessionId)) continue
++      await table.update(id, current => current.sessionIds.includes(sessionId)
++        ? { ...current, sessionIds: current.sessionIds.filter(value => value !== sessionId), updatedAt }
++        : current)
++    }
++    this.sessionOverrides.delete(sessionId)
++    this.rebuildEntities()
++  }
++
+   private async bootstrap(headers: readonly SessionHeader[]): Promise<void> {
+     const table = this.requireTable()
+     const state = this.requireState()
+     const groupsByPath = new Map<string, SessionHeader[]>()
+     for (const header of headers) {
++      if (this.sessionOverrides.has(header.id)) continue
+       const path = this.sessionPaths.get(header.id)
+       if (path === undefined) continue
+       const group = groupsByPath.get(path)
+@@ -731,6 +1020,7 @@ export class WorkspaceRegistry extends Service {
+         workspaceIds,
+         archivedSessionIds: state.archivedSessionIds,
+         pinnedSessionIds: state.pinnedSessionIds,
++        sessionWorkspaceOverrides: state.sessionWorkspaceOverrides,
+       })
+     }
+     await this.setState({
+@@ -738,6 +1028,7 @@ export class WorkspaceRegistry extends Service {
+       workspaceIds,
+       archivedSessionIds: state.archivedSessionIds,
+       pinnedSessionIds: state.pinnedSessionIds,
++      sessionWorkspaceOverrides: state.sessionWorkspaceOverrides,
+     })
+   }
+ 
+@@ -782,6 +1073,34 @@ export class WorkspaceRegistry extends Service {
+         accounted.set(sessionId, id)
+       }
+     }
++
++    const overridden = new Set<SessionId>()
++    for (const entry of state.sessionWorkspaceOverrides) {
++      if (overridden.has(entry.sessionId)) {
++        throw new Error(`workspace domain is inconsistent: session '${entry.sessionId}' has repeated move overrides`)
++      }
++      overridden.add(entry.sessionId)
++      if (table.get(entry.workspaceId) === undefined) {
++        throw new Error(
++          `workspace domain is inconsistent: session '${entry.sessionId}' overrides to missing workspace '${entry.workspaceId}'`,
++        )
++      }
++      if (accounted.get(entry.sessionId) !== entry.workspaceId) {
++        throw new Error(
++          `workspace domain is inconsistent: session '${entry.sessionId}' overrides workspace `
++          + `'${entry.workspaceId}' but its record accounting disagrees`,
++        )
++      }
++    }
++  }
++
++  private indexOverrides(state: WorkspaceDomainState): void {
++    this.sessionOverrides.clear()
++    for (const entry of state.sessionWorkspaceOverrides) this.sessionOverrides.set(entry.sessionId, entry.workspaceId)
++  }
++
++  private overrideList(): WorkspaceDomainState['sessionWorkspaceOverrides'] {
++    return [...this.sessionOverrides].map(([sessionId, workspaceId]) => ({ sessionId, workspaceId }))
+   }
+ 
+   private rebuildEntities(): void {
+diff --git a/packages/workspace/workspace/src/spec.ts b/packages/workspace/workspace/src/spec.ts
+index 9bd79225..7bd3e237 100644
+--- a/packages/workspace/workspace/src/spec.ts
++++ b/packages/workspace/workspace/src/spec.ts
+@@ -40,8 +40,24 @@ export type WorkspaceRecord = z.infer<typeof workspaceRecord>
+ const workspacePendingMutation = z.discriminatedUnion('operation', [
+   z.object({ operation: z.literal('create'), workspaceId }),
+   z.object({ operation: z.literal('delete'), workspaceId }),
++  z.object({
++    operation: z.literal('moveSession'),
++    sessionId,
++    fromWorkspaceId: workspaceId.optional(),
++    toWorkspaceId: workspaceId,
++    targetCwd: z.string(),
++  }),
++  z.object({ operation: z.literal('detachSession'), sessionId }),
+ ])
+ 
++/**
++ * Durable workspace override for a Session whose effective project is a
++ * Workspace other than the one named by its immutable header. Set only by an
++ * explicit move; membership itself stays in the workspace record's
++ * `sessionIds` account.
++ */
++const sessionWorkspaceOverride = z.object({ sessionId, workspaceId })
++
+ /**
+  * Durable registry state. `initialized` distinguishes a valid empty registry
+  * from one that still needs the header-only history bootstrap;
+@@ -61,6 +77,7 @@ export const workspaceDomainState = z.object({
+   workspaceIds: z.array(workspaceId),
+   archivedSessionIds: z.array(sessionId).default([]),
+   pinnedSessionIds: z.array(sessionId).default([]),
++  sessionWorkspaceOverrides: z.array(sessionWorkspaceOverride).default([]),
+   pendingMutation: workspacePendingMutation.optional(),
+ })
+ 
+@@ -78,7 +95,13 @@ export const workspaceDomainSpec = defineDomain({
+   version: 2,
+   global: {
+     schema: workspaceDomainState,
+-    initial: { initialized: false, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] },
++    initial: {
++      initialized: false,
++      workspaceIds: [],
++      archivedSessionIds: [],
++      pinnedSessionIds: [],
++      sessionWorkspaceOverrides: [],
++    },
+   },
+   tables: { workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord) },
+ })
+diff --git a/packages/workspace/workspace/tests/session-move.spec.ts b/packages/workspace/workspace/tests/session-move.spec.ts
+new file mode 100644
+index 00000000..6605d2b0
+--- /dev/null
++++ b/packages/workspace/workspace/tests/session-move.spec.ts
+@@ -0,0 +1,208 @@
++import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { Context } from '@deepseek-ai/cordis'
++import { afterEach, describe, expect, it } from 'vitest'
++import Storage from '@deepseek-ai/dsh-storage'
++import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
++import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
++import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
++import { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
++import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
++import WorkspaceRegistry from '../src/index.ts'
++
++const roots: string[] = []
++
++interface Volume {
++  readonly headers: Map<string, SessionHeader>
++  readonly events: Map<string, SessionEvent[]>
++  failNextAppend: boolean
++}
++
++/**
++ * Header/event persistence double for the move journal. The operations here
++ * are the same service surface the real seam exposes; only durable bytes are
++ * replaced, so recovery logic and event shapes are exercised unmodified.
++ */
++function volume(): Volume {
++  return { headers: new Map(), events: new Map(), failNextAppend: false }
++}
++
++function header(id: string, cwd: string): SessionHeader {
++  return { version: SESSION_FORMAT_VERSION, id: SessionId(id), createdAt: 1, isSeeded: false, cwd }
++}
++
++function persistenceFor(state: Volume) {
++  return {
++    async list() {
++      return [...state.headers.values()].map(header => ({ header, revision: SessionPersistenceRevision('rev') }))
++    },
++    async stat(id: string) {
++      const found = state.headers.get(id)
++      return found === undefined ? undefined : { header: found, revision: SessionPersistenceRevision('rev') }
++    },
++    async open(id: string) {
++      const found = state.headers.get(id)
++      if (found === undefined) throw new Error(`missing ${id}`)
++      const events = state.events.get(id) ?? []
++      return {
++        header: found,
++        read: async () => ({ events }),
++        append: async (batch: readonly SessionEvent[]) => {
++          if (state.failNextAppend) {
++            state.failNextAppend = false
++            throw new Error('injected append failure')
++          }
++          events.push(...batch)
++          state.events.set(id, events)
++        },
++        close: async () => {},
++      }
++    },
++  }
++}
++
++async function workspaceDirs(): Promise<{ a: string; b: string }> {
++  const root = await mkdtemp(join(tmpdir(), 'dsh-workspace-move-'))
++  roots.push(root)
++  const a = join(root, 'project-a')
++  const b = join(root, 'project-b')
++  await mkdir(a)
++  await mkdir(b)
++  return { a: await realpath(a), b: await realpath(b) }
++}
++
++async function boot(pool: MemoryMediaPool, state: Volume) {
++  const ctx = new Context()
++  await ctx.plugin(Storage)
++  ctx.storage.backend.register('memory', new MemoryStorageBackend(pool))
++  const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
++  ctx.storage.mount('domain', facility)
++  ctx.provide('storageDomain', facility)
++  ctx.provide('sessionPersistence', persistenceFor(state) as never)
++  ctx.provide('sessions', { get: () => undefined, list: () => [] } as never)
++  const fiber = await ctx.plugin(WorkspaceRegistry)
++  return { ctx, fiber, registry: ctx.workspaceRegistry }
++}
++
++afterEach(async () => {
++  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
++})
++
++describe('WorkspaceRegistry move journal', () => {
++  it('recovers an effective directory and membership together after a restart', async () => {
++    const { a, b } = await workspaceDirs()
++    const state = volume()
++    state.headers.set('session-move', header('session-move', a))
++    state.events.set('session-move', [])
++    const pool = new MemoryMediaPool()
++    const first = await boot(pool, state)
++    const source = first.registry.list().find(workspace => workspace.path === a)
++    expect(source).toBeDefined()
++    const target = await first.registry.create(b)
++    await first.registry.beginSessionMove(SessionId('session-move'), target.id)
++    await first.fiber.dispose()
++
++    // Simulated restart: the marker is durable, neither cwd nor membership has
++    // been applied yet. Recovery must complete both halves.
++    const second = await boot(pool, state)
++    const reloaded = second.registry.list()
++    const reloadedSource = reloaded.find(workspace => workspace.path === a)
++    const reloadedTarget = reloaded.find(workspace => workspace.path === b)
++    expect(reloadedSource?.sessionIds).not.toContain(SessionId('session-move'))
++    expect(reloadedTarget?.sessionIds).toContain(SessionId('session-move'))
++    const changes = state.events.get('session-move') ?? []
++    expect(changes.filter(event => event.type === 'working-directory/change').map(event => event.data)).toEqual([{ cwd: b }])
++    await second.fiber.dispose()
++  })
++
++  it('is idempotent when the directory event committed before the crash', async () => {
++    const { a, b } = await workspaceDirs()
++    const state = volume()
++    state.headers.set('session-move', header('session-move', a))
++    state.events.set('session-move', [])
++    const pool = new MemoryMediaPool()
++    const first = await boot(pool, state)
++    const target = await first.registry.create(b)
++    await first.registry.beginSessionMove(SessionId('session-move'), target.id)
++    const handle = await (persistenceFor(state).open('session-move') as Promise<{
++      append: (batch: readonly SessionEvent[]) => Promise<void>
++      close: () => Promise<void>
++    }>)
++    await handle.append([{
++      type: 'working-directory/change',
++      seq: SessionSeq(0),
++      time: 2,
++      data: { cwd: b },
++    } as SessionEvent])
++    await handle.close()
++    await first.fiber.dispose()
++
++    const second = await boot(pool, state)
++    const changes = (state.events.get('session-move') ?? []).filter(event => event.type === 'working-directory/change')
++    expect(changes).toHaveLength(1)
++    const reloadedTarget = second.registry.list().find(workspace => workspace.path === b)
++    expect(reloadedTarget?.sessionIds).toContain(SessionId('session-move'))
++    await second.fiber.dispose()
++  })
++
++
++  it('recovers a failed marker before a new move and never overwrites it', async () => {
++    const { a, b } = await workspaceDirs()
++    const state = volume()
++    state.headers.set('session-one', header('session-one', a))
++    state.headers.set('session-two', header('session-two', a))
++    state.events.set('session-one', [])
++    state.events.set('session-two', [])
++    const pool = new MemoryMediaPool()
++    const first = await boot(pool, state)
++    const source = first.registry.list().find(workspace => workspace.path === a)
++    const target = await first.registry.create(b)
++    await first.registry.beginSessionMove(SessionId('session-one'), target.id)
++    state.failNextAppend = true
++    await expect(first.registry.completeSessionMove(SessionId('session-one'))).rejects.toThrow(/injected append failure/)
++    // Queueing the second move must first finish the failed first marker instead
++    // of overwriting it with session-two's intent.
++    await first.registry.moveSession(SessionId('session-two'), target.id)
++    const reloaded = first.registry.list()
++    const movedSource = reloaded.find(workspace => workspace.path === a)
++    const movedTarget = reloaded.find(workspace => workspace.path === b)
++    expect(movedSource?.sessionIds).not.toContain(SessionId('session-one'))
++    expect(movedSource?.sessionIds).not.toContain(SessionId('session-two'))
++    expect(movedTarget?.sessionIds).toEqual(expect.arrayContaining([SessionId('session-one'), SessionId('session-two')]))
++    for (const id of ['session-one', 'session-two']) {
++      expect((state.events.get(id) ?? []).filter(event => event.type === 'working-directory/change'))
++        .toEqual([expect.objectContaining({ data: { cwd: b } })])
++    }
++    await first.fiber.dispose()
++    const second = await boot(pool, state)
++    const reloadedTarget = second.registry.list().find(workspace => workspace.path === b)
++    expect(reloadedTarget?.sessionIds).toEqual(expect.arrayContaining([SessionId('session-one'), SessionId('session-two')]))
++    await second.fiber.dispose()
++  })
++
++  it('leaves the marker to recovery when completion fails mid-way', async () => {
++    const { a, b } = await workspaceDirs()
++    const state = volume()
++    state.headers.set('session-move', header('session-move', a))
++    state.events.set('session-move', [])
++    const pool = new MemoryMediaPool()
++    const first = await boot(pool, state)
++    const source = first.registry.list().find(workspace => workspace.path === a)
++    const target = await first.registry.create(b)
++    await first.registry.beginSessionMove(SessionId('session-move'), target.id)
++    state.failNextAppend = true
++    await expect(first.registry.completeSessionMove(SessionId('session-move'))).rejects.toThrow(/injected append failure/)
++    // The failed completion did not move membership either.
++    expect(source?.sessionIds).toContain(SessionId('session-move'))
++    await first.fiber.dispose()
++
++    const second = await boot(pool, state)
++    const reloadedSource = second.registry.list().find(workspace => workspace.path === a)
++    const reloadedTarget = second.registry.list().find(workspace => workspace.path === b)
++    expect(reloadedSource?.sessionIds).not.toContain(SessionId('session-move'))
++    expect(reloadedTarget?.sessionIds).toContain(SessionId('session-move'))
++    expect((state.events.get('session-move') ?? []).filter(event => event.type === 'working-directory/change')).toHaveLength(1)
++    await second.fiber.dispose()
++  })
++})
+diff --git a/packages/workspace/workspace/tests/workspace.spec.ts b/packages/workspace/workspace/tests/workspace.spec.ts
+index 988e9995..acc98fcc 100644
+--- a/packages/workspace/workspace/tests/workspace.spec.ts
++++ b/packages/workspace/workspace/tests/workspace.spec.ts
+@@ -204,7 +204,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
+     await fiber.await()
+     expect(ctx.workspaceRegistry.list()).toEqual([])
+     expect(list).toHaveBeenCalledTimes(1)
+-    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] })
++    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [], sessionWorkspaceOverrides: [] })
+   })
+ 
+   it('bootstraps once from list headers only, in workspace/session createdAt order', async () => {
+@@ -239,6 +239,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
+       workspaceIds: result.registry.list().map(workspace => workspace.id),
+       archivedSessionIds: [],
+       pinnedSessionIds: [],
++      sessionWorkspaceOverrides: [],
+     })
+   })
+ 
+@@ -267,7 +268,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
+     const second = await harness({ pool, sessions: [header('late', late, 100)] })
+     expect(second.list).not.toHaveBeenCalled()
+     expect(second.registry.list()).toEqual([])
+-    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] })
++    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [], sessionWorkspaceOverrides: [] })
+   })
+ 
+   it('reuses partial records after a bootstrap record write fails', async () => {
+@@ -521,7 +522,7 @@ describe('WorkspaceRegistry create and lookup', () => {
+     await expect(result.registry.delete(workspace.id)).resolves.toBe(false)
+     expect(result.registry.get(workspace.id)).toBeUndefined()
+     expect(result.registry.list()).toEqual([])
+-    expect(storedState(result.pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] })
++    expect(storedState(result.pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [], sessionWorkspaceOverrides: [] })
+     expect(result.pool.media.get('workspace')!.tables.get('workspaces')!.has(workspace.id)).toBe(false)
+     await expect(realpath(dir)).resolves.toBe(dir)
+     expect(result.list).toHaveBeenCalledTimes(1)
+@@ -566,6 +567,7 @@ describe('WorkspaceRegistry create and lookup', () => {
+       workspaceIds: [],
+       archivedSessionIds: [],
+       pinnedSessionIds: [],
++      sessionWorkspaceOverrides: [],
+       pendingMutation: { operation: 'delete', workspaceId: workspace.id },
+     })
+     const reregistered = await first.registry.create(dir)
+@@ -575,6 +577,7 @@ describe('WorkspaceRegistry create and lookup', () => {
+       workspaceIds: [reregistered.id],
+       archivedSessionIds: [],
+       pinnedSessionIds: [],
++      sessionWorkspaceOverrides: [],
+     })
+     await first.fiber.dispose()
+ 
+@@ -998,7 +1001,7 @@ describe('header-validated membership projection', () => {
+     const createRecovery = await harness({ pool: interruptedCreate })
+     expect(createRecovery.registry.list()).toEqual([])
+     expect(interruptedCreate.media.get('workspace')!.tables.get('workspaces')!.has(createId)).toBe(false)
+-    expect(storedState(interruptedCreate)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] })
++    expect(storedState(interruptedCreate)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [], sessionWorkspaceOverrides: [] })
+ 
+     const interruptedDelete = storedPool(
+       [[deleteId, record(deleteDir, [])]],
+@@ -1011,7 +1014,7 @@ describe('header-validated membership projection', () => {
+     const deleteRecovery = await harness({ pool: interruptedDelete })
+     expect(deleteRecovery.registry.list()).toEqual([])
+     expect(interruptedDelete.media.get('workspace')!.tables.get('workspaces')!.has(deleteId)).toBe(false)
+-    expect(storedState(interruptedDelete)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] })
++    expect(storedState(interruptedDelete)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [], sessionWorkspaceOverrides: [] })
+ 
+     const corruptPending = storedPool(
+       [[deleteId, record(deleteDir, [])]],

@@ -76,8 +76,12 @@ export interface SessionQueryLike {
 
 /** The `ctx.sessionController` slice: the Host's own Session creation path. */
 export interface SessionControllerLike {
-  /** Host-owned permanent deletion, present only in Hosts carrying the upstream patch. */
+  /** Host-owned permanent deletion of any Session, present only in patched/newer Hosts. */
+  deleteSession?(sessionId: string): Promise<void>
+  /** Host-owned permanent deletion of an archived Session, present only in patched Hosts. */
   deleteArchivedSession?(sessionId: string): Promise<void>
+  /** Host-owned move to a registered Workspace, present only in patched/newer Hosts. */
+  moveSession?(sessionId: string, targetWorkspaceId: string): Promise<void>
   list(request: unknown, signal?: AbortSignal): Promise<{ readonly items: readonly SessionSummaryLike[] }>
   create(request: {
     readonly sessionId?: string

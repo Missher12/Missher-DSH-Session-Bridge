@@ -1,0 +1,17 @@
+# Pure SB fragment for the client-safe host lifecycle layer.
+# Keep the official session-controller row enabled (its dsh.client provides the
+# browser sessions service); replace persistence-jsonl and workspace; add the
+# host-only decorator to the official controller instance.
+- id: session-persistence-jsonl
+  disabled: true
+- id: workspace
+  disabled: true
+- insert:
+    - id: sb-session-persistence-jsonl
+      name: '@missher/sb-host-session-persistence-jsonl'
+      config:
+        root: !!js dshHomePath('sessions')
+    - id: sb-workspace
+      name: '@missher/sb-host-workspace'
+    - id: sb-host-session-lifecycle
+      name: '@missher/sb-host-session-lifecycle'

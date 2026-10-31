@@ -84,7 +84,7 @@ it('keeps identity actions in the sidebar without a header control or identity o
     locale: { register: () => () => {} },
     uiWorkspace: {},
     sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
-    workspaces: { list: { getSnapshot: () => ({ archivedSessionIds: [] }), subscribe: () => () => {} } },
+    workspaces: { list: { getSnapshot: () => ({ items: [], archivedSessionIds: [] }), subscribe: () => () => {} } },
     slots: {
       inject(_name, register) { register() },
       register(options, component) { registrations.push({ ...options, component }); return () => {} },
@@ -104,6 +104,9 @@ it('keeps identity actions in the sidebar without a header control or identity o
   assert.equal(registrations.filter(entry => entry.id === 'session-bridge-picker').length, 1)
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.copy-notice').length, 1)
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.delete-dialog').length, 1)
+  assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move').length, 0)
+  assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move-dialog').length, 0)
+  assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move-toast').length, 1)
 })
 
 it('reports a missing cwd or clipboard rejection without inventing a directory', async () => {
@@ -168,7 +171,7 @@ it('owns its stylesheet before insertion and disposes only its own generation', 
       uiWorkspace: {},
       slots: { inject() {} },
       sessions: { list: { getSnapshot: () => ({ byId: {} }) } },
-      workspaces: { list: { getSnapshot: () => ({ archivedSessionIds: [] }), subscribe: () => () => {} } },
+      workspaces: { list: { getSnapshot: () => ({ items: [], archivedSessionIds: [] }), subscribe: () => () => {} } },
     })
     return () => { for (const dispose of disposers.reverse()) dispose() }
   }
@@ -184,67 +187,68 @@ it('owns its stylesheet before insertion and disposes only its own generation', 
 })
 
 
-it('requests confirmation first; cancel and unarchived rows never send a deletion', async () => {
-  let ids = ['archived']
+it('requests confirmation for any session; cancel never sends a deletion', async () => {
   let requests = 0
-  const actions = client.createSessionDeleteActions({ getSnapshot: () => ({ archivedSessionIds: ids }) }, async () => {
+  const actions = client.createSessionDeleteActions(async () => {
     requests++
-    return Response.json({ ok: true, value: { sessionId: 'archived' } })
+    return Response.json({ ok: true, value: { sessionId: 'ordinary' } })
   })
-  actions.request('live')
-  assert.equal(actions.getSnapshot(), null)
-  actions.request('archived')
-  assert.equal(actions.getSnapshot().sessionId, 'archived')
+  actions.request('ordinary')
+  assert.equal(actions.getSnapshot().sessionId, 'ordinary')
   assert.equal(requests, 0)
   actions.dismiss()
+  assert.equal(actions.getSnapshot(), null)
   await actions.confirm()
-  assert.equal(requests, 0)
-  actions.request('archived')
-  ids = []
-  await actions.confirm()
-  assert.equal(actions.getSnapshot().error, 'delete.notArchived')
   assert.equal(requests, 0)
 })
 
 it('sends the exact confirmed identity once and leaves a busy dialog open until settled', async () => {
   let finish
   let requests = 0
-  const actions = client.createSessionDeleteActions({ getSnapshot: () => ({ archivedSessionIds: ['archived'] }) }, async (path, options) => {
+  const actions = client.createSessionDeleteActions(async (path, options) => {
     requests++
     assert.equal(path, 'api/session-bridge/delete-session')
-    assert.deepEqual(JSON.parse(options.body), { sessionId: 'archived', confirmed: true })
+    assert.deepEqual(JSON.parse(options.body), { sessionId: 'ordinary', confirmed: true })
     assert.equal(options.credentials, 'same-origin')
     return await new Promise(resolve => { finish = resolve })
   })
-  actions.request('archived')
+  actions.request('ordinary')
   const pending = actions.confirm()
   await actions.confirm()
   actions.dismiss()
   assert.equal(actions.getSnapshot().pending, true)
   assert.equal(requests, 1)
-  finish(Response.json({ ok: true, value: { sessionId: 'archived' } }))
+  finish(Response.json({ ok: true, value: { sessionId: 'ordinary' } }))
   await pending
   assert.equal(actions.getSnapshot().done, true)
 })
 
-it('keeps old-Host and busy failures explicit and suppresses late feedback after unload', async () => {
+it('keeps Host failures explicit and suppresses late feedback after unload', async () => {
   let response = Response.json({ ok: false, error: { code: 'session/delete-unsupported' } }, { status: 501 })
-  const actions = client.createSessionDeleteActions({ getSnapshot: () => ({ archivedSessionIds: ['archived'] }) }, async () => response)
-  actions.request('archived')
+  const actions = client.createSessionDeleteActions(async () => response)
+  actions.request('ordinary')
   await actions.confirm()
   assert.equal(actions.getSnapshot().error, 'delete.unsupported')
+  actions.dismiss()
+  actions.request('ordinary')
   response = Response.json({ ok: false, error: { code: 'session/delete-owned' } }, { status: 409 })
   await actions.confirm()
-  assert.equal(actions.getSnapshot().error, 'delete.unsupported', 'an unsupported dialog cannot submit again')
-  actions.dismiss()
-  actions.request('archived')
-  await actions.confirm()
   assert.equal(actions.getSnapshot().error, 'delete.busy')
-  response = Response.json({ ok: true, value: { sessionId: 'archived' } })
+  actions.dismiss()
+  actions.request('ordinary')
+  response = Response.json({ ok: true, value: { sessionId: 'ordinary' } })
   const pending = actions.confirm()
   actions.dispose()
   await pending
   assert.equal(actions.getSnapshot(), null)
+})
+
+it('turns the archived-only Host refusal into an explicit message', async () => {
+  const actions = client.createSessionDeleteActions(async () =>
+    Response.json({ ok: false, error: { code: 'session/delete-not-archived' } }, { status: 409 }))
+  actions.request('ordinary')
+  await actions.confirm()
+  assert.equal(actions.getSnapshot().error, 'delete.notArchived')
 })
 
 it('distinguishes unsupported deletion from a failed or malformed capability check', async () => {
@@ -270,15 +274,56 @@ it('distinguishes unsupported deletion from a failed or malformed capability che
 
 it('reports text-only POST 501 and blocks repeated confirmation until the dialog is reopened', async () => {
   let sends = 0
-  const actions = client.createSessionDeleteActions({ getSnapshot: () => ({ archivedSessionIds: ['archived'] }) }, async () => {
+  const actions = client.createSessionDeleteActions(async () => {
     sends++
     return new Response('Unsupported', { status: 501 })
   })
-  actions.request('archived')
+  actions.request('ordinary')
   await actions.confirm()
   await actions.confirm()
   assert.equal(sends, 1)
   assert.equal(actions.getSnapshot().error, 'delete.unsupported')
   actions.dismiss()
   assert.equal(actions.getSnapshot(), null)
+})
+
+it('refreshes Session summaries after a confirmed deletion', async () => {
+  let refreshed = 0
+  const actions = client.createSessionDeleteActions(
+    async () => Response.json({ ok: true, value: { sessionId: 'ordinary' } }),
+    () => { refreshed += 1 },
+  )
+  actions.request('ordinary')
+  await actions.confirm()
+  assert.equal(refreshed, 1)
+})
+
+it('sends only when a drag target calls moveTo and refreshes after success', async () => {
+  let requests = 0
+  let refreshed = 0
+  const actions = client.createSessionMoveActions(async (path, options) => {
+    requests += 1
+    assert.equal(path, 'api/session-bridge/move-session')
+    assert.deepEqual(JSON.parse(options.body), { sessionId: 'ordinary', targetWorkspaceId: 'workspace-two', confirmed: true })
+    assert.equal(options.credentials, 'same-origin')
+    return Response.json({ ok: true, value: { sessionId: 'ordinary', targetWorkspaceId: 'workspace-two' } })
+  }, () => { refreshed += 1 })
+  assert.equal(actions.getSnapshot(), null)
+  await actions.moveTo('ordinary', 'workspace-two')
+  assert.equal(requests, 1)
+  assert.equal(actions.getSnapshot().phase, 'done')
+  assert.equal(refreshed, 1)
+})
+it('shows the Host refusal reason and permits a later drag retry', async () => {
+  let response = Response.json({ ok: false, error: { code: 'session/move-active' } }, { status: 409 })
+  let refreshed = 0
+  const actions = client.createSessionMoveActions(async () => response, () => { refreshed += 1 })
+  await actions.moveTo('ordinary', 'workspace-two')
+  assert.equal(actions.getSnapshot().phase, 'error')
+  assert.equal(actions.getSnapshot().error, 'move.active')
+  assert.equal(refreshed, 0)
+  response = Response.json({ ok: true, value: { sessionId: 'ordinary', targetWorkspaceId: 'workspace-two' } })
+  await actions.moveTo('ordinary', 'workspace-two')
+  assert.equal(actions.getSnapshot().phase, 'done')
+  assert.equal(refreshed, 1)
 })

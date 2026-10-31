@@ -1,0 +1,9 @@
+{
+  "name": "@missher/sb-host-session-lifecycle",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  }
+}

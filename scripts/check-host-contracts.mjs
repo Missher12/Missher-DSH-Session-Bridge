@@ -32,8 +32,16 @@ declare const registry: WorkspaceRegistry;
 declare const controller: SessionController;
 type HostDeletion = SessionController extends { deleteArchivedSession: infer Method }
   ? { deleteArchivedSession: Method } : { deleteArchivedSession?: never };
+type HostFullDeletion = SessionController extends { deleteSession: infer Method }
+  ? { deleteSession: Method } : { deleteSession?: never };
+type HostMove = SessionController extends { moveSession: infer Method }
+  ? { moveSession: Method } : { moveSession?: never };
 declare const optionalDeletion: HostDeletion;
+declare const optionalFullDeletion: HostFullDeletion;
+declare const optionalMove: HostMove;
 const deletion: Pick<SessionControllerLike, 'deleteArchivedSession'> = optionalDeletion;
+const fullDeletion: Pick<SessionControllerLike, 'deleteSession'> = optionalFullDeletion;
+const move: Pick<SessionControllerLike, 'moveSession'> = optionalMove;
 const hostFetch: ScratchConnection = hostConnection;
 const clientStore: ClientContextLike['workspaces'] = workspaces;
 const sessionSummaries: ClientContextLike['sessions'] = sessions;
@@ -53,5 +61,5 @@ const workspaceCreate: Pick<WorkspaceRegistryLike, 'create'> = registry;
       getCanonicalFileName: name => name, getCurrentDirectory: () => root, getNewLine: () => '\n',
     }))
     process.exitCode = 1
-  } else console.log('DSH Host Connection Fetch, workspace create and native picker declarations match')
+  } else console.log('DSH Host Connection Fetch, workspace create, picker and optional session lifecycle declarations match')
 } finally { await rm(directory, { recursive: true, force: true }) }

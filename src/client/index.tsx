@@ -9,11 +9,15 @@ import { createSessionCopyActions, SessionCopyMenuItem, SessionCopyNotice } from
 import type { SessionCopyKind, SessionListReader } from './session-menu.js'
 
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
-import type { ArchiveSource } from './session-delete.js'
+import { createSessionMoveActions, SessionMoveToast } from './session-move.js'
+import { installSessionDrag } from './session-drag.js'
+import type { WorkspaceMoveSource } from './session-move.js'
 import { trackScratchPlacement } from './scratch-placement.js'
 import type { WorkspacePlacementSource } from './scratch-placement.js'
 
 export { createSessionDeleteActions, readSessionDeleteCapability } from './session-delete.js'
+export { createSessionMoveActions } from './session-move.js'
+export type { MoveWorkspace, WorkspaceMoveSource } from './session-move.js'
 export { createSessionCopyActions } from './session-menu.js'
 
 export { copyPayload, shortenSessionId, writeClipboard } from './clipboard.js'
@@ -62,6 +66,7 @@ const STYLES = `
   color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.5;
   white-space: normal; overflow-wrap: anywhere;
 }
+.dsh-sb-drop-target { outline: 2px solid var(--dsw-alias-brand-primary, #4f7cff); outline-offset: -2px; border-radius: 6px; }
 /*
  * One line, never shortened, always reachable.
  *
@@ -206,7 +211,10 @@ export interface ClientContextLike {
     /** Optional on older Hosts; the picker remains usable without sidebar placement. */
     registerTrailingWorkspace?(workspaceId: string): () => void
   }
-  readonly workspaces: { readonly list: ArchiveSource & WorkspacePlacementSource; create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }> }
+  readonly workspaces: {
+    readonly list: WorkspaceMoveSource & WorkspacePlacementSource
+    create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
+  }
   readonly sessions: SessionListReader
   effect(disposer: () => unknown, label?: string): void
 }
@@ -267,8 +275,13 @@ export function apply(ctx: ClientContextLike): void {
     ctx.effect(() => trackScratchPlacement(ctx.workspaces.list, picker.findScratchWorkspace, registerTrailing), 'session-bridge: trailing workspace placement')
   }
   const copyActions = createSessionCopyActions(ctx.sessions)
-  const deleteActions = createSessionDeleteActions(ctx.workspaces.list)
-  ctx.effect(() => () => { deleteActions.dispose() }, 'session-bridge: deletion confirmation')
+  const refreshSessions = (): void => {
+    try { ctx.sessions.refresh?.() } catch { /* refresh is best-effort */ }
+  }
+  const deleteActions = createSessionDeleteActions(fetch, refreshSessions)
+  const moveActions = createSessionMoveActions(fetch, refreshSessions)
+  ctx.effect(() => installSessionDrag(moveActions, ctx.workspaces.list), 'session-bridge: workspace drag move')
+  ctx.effect(() => () => { deleteActions.dispose(); moveActions.dispose() }, 'session-bridge: deletion and drag move')
   ctx.effect(() => () => { copyActions.dispose() }, 'session-bridge: sidebar actions')
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'session-bridge: dictionaries')
   ctx.effect(installStyles, 'session-bridge: styles')
@@ -291,12 +304,16 @@ export function apply(ctx: ClientContextLike): void {
   }
   ctx.slots.inject(menu, () => ctx.slots.register({
     name: menu, id: 'dsh-session-bridge.delete', order: 600, locale: NS,
-    inject: () => ({ archive: ctx.workspaces.list, deleteActions }),
+    inject: () => ({ sessions: ctx.sessions, deleteActions }),
   }, SessionDeleteMenuItem))
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'dsh-session-bridge.delete-dialog', locale: NS,
     inject: () => ({ deleteActions }),
   }, SessionDeleteDialog))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay', id: 'dsh-session-bridge.move-toast', locale: NS,
+    inject: () => ({ moveActions }),
+  }, SessionMoveToast))
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'dsh-session-bridge.copy-notice', locale: NS,
     inject: () => ({ copyActions }),
