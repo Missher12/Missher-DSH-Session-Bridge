@@ -4,9 +4,9 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **0.1.8** local candidate (confirmed delete; sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
+- Package: `@missher/dsh-session-bridge`; version: **0.1.9** local candidate (workspace activity badges, confirmed delete, sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
-- The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
+- The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace. Each workspace header shows live pending/working, event-verified completed, idle, or unknown status.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
 - [License](LICENSE) · [Upstream attribution](THIRD_PARTY_NOTICES.md) · [Compatibility record](COMPATIBILITY.json)
 

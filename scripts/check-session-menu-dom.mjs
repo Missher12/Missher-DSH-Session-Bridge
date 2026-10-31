@@ -44,12 +44,18 @@ try {
   let refreshes = 0
   let probe = async () => Response.json({ supported: true })
   const registrations = new Map()
-  const sessionsRow = { archived: { cwd: '/synthetic/workspace', running: false } }
+  const sessionsRow = { archived: { cwd: '/synthetic/workspace', running: false }, 'drag-me': { cwd: '/private/tmp/dsh-scratch', running: false }, 'pending-wait': { running: false }, 'running-other': { running: true }, 'completed-other': { running: false }, rejected: { running: false } }
+  let statusSnapshot = new Map()
+  const sessionsSnapshot = { byId: sessionsRow, ids: Object.keys(sessionsRow), phase: 'ready', projectionsBySession: {} }
+  const statusListeners = new Set()
+  let generation = 'generation-1'
+  const generationListeners = new Set()
+  let finishValidation
   const workspacesList = {
     getSnapshot() {
       return {
         items: [
-          { workspaceId: 'workspace-source', title: 'Outside a workspace', path: '/private/tmp/dsh-scratch', sessionIds: ['archived', 'drag-me'] },
+          { workspaceId: 'workspace-source', title: 'Outside a workspace', path: '/private/tmp/dsh-scratch', sessionIds: ['archived', 'drag-me', 'pending-wait', 'running-other', 'completed-other', 'rejected'] },
           { workspaceId: 'workspace-target', title: 'Crodis', path: '/Users/missher/Documents/Deepseek-File/Crodis', sessionIds: [] },
         ],
         archivedSessionIds: ['archived'],
@@ -67,7 +73,7 @@ try {
     } }
   const sandbox = {
     window: dom.window, document, navigator, console, setTimeout, clearTimeout, AbortController,
-    Node: dom.window.Node, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement,
+    Node: dom.window.Node, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, MutationObserver: dom.window.MutationObserver,
     getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
     requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
     cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
@@ -94,7 +100,10 @@ try {
     effect(start) { const dispose = start(); if (typeof dispose === 'function') cleanup.push(dispose) },
     locale: { register: () => () => {} },
     uiWorkspace: {}, workspaces: { list: workspacesList },
-    sessions: { refresh: () => { refreshes++ }, list: { getSnapshot: () => ({ byId: sessionsRow }) } },
+    sessions: { refresh: () => { refreshes++ }, list: { getSnapshot: () => sessionsSnapshot, subscribe: () => () => {} } },
+    uiSession: { sessionStatus: { getSnapshot: () => statusSnapshot, subscribe: listener => { statusListeners.add(listener); return () => { statusListeners.delete(listener) } } } },
+    connection: { generation: { getSnapshot: () => generation, subscribe: listener => { generationListeners.add(listener); return () => { generationListeners.delete(listener) } } } },
+    remote: { session: { events: () => new Promise(resolve => { finishValidation = resolve }) } },
     slots: { inject(_slot, register) { register() }, register(options, component) {
       registrations.set(options.id, { options, component }); return () => {}
     } },
@@ -236,6 +245,75 @@ try {
     await Promise.resolve()
   })
   assert.ok(document.body.textContent.includes('still has active work'))
+  const notifyStatus = () => { for (const listener of statusListeners) listener() }
+  await act(async () => {
+    statusSnapshot = new Map([
+      ['drag-me', { completionUnread: true, running: false }],
+      ['archived', { running: false }],
+      ['pending-wait', { running: false }],
+      ['running-other', { running: false }],
+      ['completed-other', { running: false }],
+    ])
+    notifyStatus()
+    await Promise.resolve()
+  })
+  assert.ok(finishValidation, 'completion validation starts with a controlled request')
+  await act(async () => {
+    statusSnapshot = new Map([
+      ['drag-me', { completionUnread: true, running: false }],
+      ['archived', { running: false }],
+      ['pending-wait', { running: false }],
+      ['running-other', { running: false }],
+      ['completed-other', { running: false }],
+      ['other', { running: true }],
+    ])
+    notifyStatus()
+    await Promise.resolve()
+  })
+  assert.equal(document.body.textContent.includes('已完成'), false, 'other-session update must not cancel the pending validation')
+  await act(async () => {
+    finishValidation({ ok: true, value: { records: [{ event: { type: 'turn/end', data: { reason: { kind: 'completed' } } } }] } })
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  assert.ok([...document.querySelectorAll('.dsh-sb-ws-status')].some(node => node.textContent.includes('已完成')),
+    'the original candidate still turns green after another session updates')
+  await act(async () => {
+    statusSnapshot = new Map([
+      ['archived', { running: false }],
+      ['drag-me', { running: false }],
+      ['pending-wait', { pendingInteraction: { kind: 'approval' }, running: false }],
+      ['running-other', { running: true }],
+      ['completed-other', { completionUnread: true, running: false }],
+    ])
+    notifyStatus()
+    await Promise.resolve()
+  })
+  const sourceBadge = document.querySelector('[data-row-key="workspace:workspace-source"] .dsh-sb-ws-status')
+  assert.ok(sourceBadge?.textContent.includes('等你处理 · 1'), 'pending count is shown')
+  assert.ok(sourceBadge?.textContent.includes('工作中 · 1'), 'running count remains visible alongside pending')
+  assert.equal(sourceBadge?.textContent.includes('已完成'), false, 'green completion is suppressed while pending/running exist')
+  await act(async () => {
+    statusSnapshot = new Map([
+      ['archived', { running: false }],
+      ['drag-me', { running: false }],
+      ['pending-wait', { running: false }],
+      ['running-other', { running: false }],
+      ['completed-other', { running: false }],
+      ['rejected', { completionUnread: true, running: false }],
+      ['other', { running: true }],
+    ])
+    notifyStatus()
+    await Promise.resolve()
+  })
+  assert.ok(finishValidation, 'the rejected result starts validation')
+  await act(async () => {
+    finishValidation({ ok: false, error: { code: 'session/events' } })
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  assert.equal(document.querySelector('[data-row-key="workspace:workspace-source"] .dsh-sb-ws-status')?.textContent.includes('已完成'), false,
+    'a failed Remote Result must not turn green')
   const anchor = document.createElement('button')
   document.body.appendChild(anchor)
   const picks = []
@@ -295,6 +373,7 @@ try {
     scratchPickerSingleEntry: true, scratchIdentitySurvivesRename: true, sameTitleProjectPreserved: true,
     pickerOpenDoesNotCreate: true, firstScratchClickCreatesOnce: true, lookupFailureKeepsOrdinarySelection: true,
     dragAcrossWorkspace: true, dragSameWorkspaceNoop: true, dragRefusalShown: true,
+    workspaceStatusRace: true, workspaceStatusPriority: true, workspaceStatusResult: true,
     nativeElectronClicks: false, clipboardMock: true, resizeObserverMock: true, cssLayoutVerified: false }
   if (process.argv[3]) await writeFile(process.argv[3], JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))

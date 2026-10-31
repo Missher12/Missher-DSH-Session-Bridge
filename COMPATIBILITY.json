@@ -1,22 +1,22 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.8",
-  "candidateStatus": "Locally validated 0.1.8 cleanup build for the daily DSH with profile-level host lifecycle support (dead pre-drag probe, old move-dialog CSS/locales removed). User manually verified native drag in 0.1.7; RPC verified the same ID/title/history prefix and cwd. No session data was changed in this cleanup; not formally released or pushed.",
+  "packageVersion": "0.1.9",
+  "candidateStatus": "0.1.9 is installed locally with the Remote Result fix and passed native workspace completion/read-clear acceptance. This record covers the validated source and prebuilt client; release assets are separate.",
   "hardHostVersionGate": false,
-  "change": "0.1.8 is a cleanup-only release: removes the dead pre-drag capability probe, the old move-dialog CSS, and eight unused move-menu locale keys. Drag-and-drop move, deletion, host lifecycle transactions, and native order handling are unchanged.",
+  "change": "0.1.9 adds lightweight per-workspace activity badges: pending/running counts from the installed uiSession status, event-verified green completion (turn/end reason completed only), connection-generation unknown state, and child folding/deduplication. Existing deletion, drag move, host lifecycle and client registration are unchanged.",
   "currentChecks": {
     "officialRc4ApiAudit": "exact npm 0.2.1-rc.4 declarations and runtime inspected; safe deletion API absent",
     "hostAndClientTypes": "passed: client typecheck once and fresh Host compilation",
     "isolatedBuild": "passed",
     "clientModuleLoad": "passed with static module stubs",
     "offlineTests": {
-      "passed": 56,
+      "passed": 58,
       "failed": 0,
       "skipped": 12,
       "cancelled": 0,
       "concurrency": 1
     },
-    "componentDom": "passed after test harness fixes; real React/primitives; clipboard and ResizeObserver mocked; no pixel/native claim; original failures preserved",
+    "componentDom": "passed: existing menu/drag checks and workspace race, priority and real Remote Result envelope cases; real React/primitives with controlled stores, clipboard and ResizeObserver mocks; not native pixel evidence",
     "browserFixture": {
       "deletionFlows": "passed in a real Codex in-app browser using the built plugin and synthetic responses",
       "unsupportedAndFailedProbe": "visible, disabled, POST 0",
@@ -31,7 +31,7 @@
     "officialRc4HostInstallation": "daily 0.2.1-rc.4 with profile-level persistence/workspace patches and lifecycle decorator; original controller/client kept enabled; app.asar unchanged",
     "nativeElectron": "main UI, session list, model picker, removed move menu, delete confirmation/cancel verified by Codex; manual drag into Crodis confirmed by the user, then unchanged ID/title/history and target cwd independently verified via RPC; final delete button not clicked",
     "realModelCalls": "passed: disposable test session produced a real response before move/delete verification",
-    "commandNote": "Final 0.1.8 pnpm run check: 56 pass, 0 fail, 12 skips for existing SDK-dependent chip geometry cases; the obsolete probe test was removed. React/JSDOM drag, same-workspace no-op and refusal feedback passed. The moved test session was deleted through the authenticated plugin endpoint; all 70 pre-existing session IDs were preserved.",
+    "commandNote": "0.1.9 check: 58 pass, 0 fail, 12 existing SDK-dependent skips. The real {ok,value} envelope reproduces the old missing-green failure and passes after unwrapping value.records. Result ok:false stays non-green. Existing delete/drag evidence is reused for unchanged code.",
     "harnessFailureHistory": [
       "global alert selector matched unrelated Copied Toast; scoped to deletion dialog",
       "legacy header test VM lacked DOM globals; real JSDOM window/rAF/style provided; ResizeObserver remains an explicitly labelled inert test adapter",
@@ -203,8 +203,27 @@
     "hostPatch": "host-patches/20261031-session-lifecycle.patch (separate delivery, not installed, not in the plugin tgz)",
     "hostPatchVerification": "The profile-level runtime packages were installed into the daily desktop profile without touching app.asar or native components. Daily HTTP/storage verification covered ordinary and archived deletion (200, tombstoned), unconfirmed 400, real running-turn 409, and move to Crodis with real bash pwd plus reverse/forward moves; all 70 pre-existing sessions stayed intact. After finding that a tag-built controller dropped newer session/events, session/state and throughSeq-optional page behavior, the controller was rebuilt as a thin subclass of the installed controller that only adds lifecycle methods; isolated verification preserves events/page/state/wait, manages fork children, releases idle Agents, refuses running turns, and restores replaced methods on dispose. The client-safe controller/decorator profile was applied and the daily Electron UI was verified; the user then manually verified native drag move and Codex confirmed the result via RPC.",
     "clientRegistration": "The official session-controller row remains enabled; its dsh.client module registers ClientSessions and provides the browser sessions service. Daily Electron main UI, workspaces/session list and model selector were verified after the client registration fix.",
-    "dailyState": "Daily profile currently still has the old backend-only layer (session-controller row disabled); the client-safe narrow profile edit and decorator are staged but not applied. The script validates and changes only two SB fragments, never replaces the full user profile, and stores no full profile snapshot in the repo. The previously retained temporary session was cleaned by Codex; session/list is 70. Codex will apply with the desktop stopped, restart, and verify the Electron main UI, sessions list/model selector, GET support and events/page/state/wait.",
+    "dailyState": "Official session-controller/client remains enabled with the host-only lifecycle decorator and profile-level JSONL/workspace patches. Installing 0.1.9 preserved cordis.patch.yml bytes and all other dependency entries; the installed client matches the repaired build. All 71 pre-install session IDs remain present; the final list contains 72, and the additional session was not touched.",
     "clientDnd": "0.1.7 removes the move menu/picker. The user manually dragged the temporary session into Crodis in native Electron; Codex verified via RPC that the same ID/title/history prefix survived and workingDirectory became Crodis, then deleted that temporary session through the authenticated API. 0.1.8 only removes dead menu/probe remnants."
   },
-  "dailyInstalledVersion": "0.1.7"
+  "dailyInstalledVersion": "0.1.9",
+  "workspaceStatus": {
+    "source": "Installed uiSession.sessionStatus, Session list, workspaces and connection.generation.",
+    "completion": "Green requires Host completionUnread plus durable session/events last turn/end reason completed; aborted/error/blocked/interrupted/forked/max-tokens are not completion.",
+    "unknown": "connection.generation undefined or list not ready renders 状态未知.",
+    "counts": "pending kinds approval/plan-review/question; running uses status?.running ?? summary.running; parent/child members fold once; waiting parent with a waiting child is not counted running.",
+    "tests": "70 tests: 58 pass, 12 skip, 0 fail. React/JSDOM covers concurrent completion validation, mixed waiting/running priority, true Remote Result success and ok:false refusal. Earlier isolated cancel/error observations are supplemented by the unchanged turn/end reason tests; no new real cancel/error run after the Result repair.",
+    "remoteFix": "0.1.9 native acceptance showed idle while the native session row was completed. Root cause: remote.session.events returns a Result {ok,value} envelope, but the plugin read page.records directly; completion validation never saw the turn/end. Fixed to require ok===true and read value.records. Earlier claim that missing remote/remote.session injection caused the failure was not supported: ctx.get is valid without inject; explicit remote declarations are retained but are not the root cause. No polling, no false green.",
+    "nativeAcceptance": {
+      "date": "2026-10-31",
+      "host": "daily DSH 0.2.1-rc.4",
+      "installedVersion": "0.1.9",
+      "foldedRunning": "blue 工作中 · 1 observed; running logic unchanged by the later Result fix",
+      "foldedCompleted": "green 已完成 observed after real SB_GREEN_OK response on the final repaired build",
+      "viewed": "opening the completed session clears the workspace reminder to 空闲",
+      "startup": "native main UI and session list loaded",
+      "sessionIdsPreserved": 71,
+      "notRun": "No deliberate daily disconnect or real approval/question was triggered; those branches are covered by subscription/aggregation and controlled component checks."
+    }
+  }
 }

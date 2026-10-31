@@ -11,6 +11,8 @@ import type { SessionCopyKind, SessionListReader } from './session-menu.js'
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
 import { createSessionMoveActions, SessionMoveToast } from './session-move.js'
 import { installSessionDrag } from './session-drag.js'
+import { WorkspaceStatusOverlay } from './workspace-status.js'
+import type { WorkspaceStatusInjected } from './workspace-status.js'
 import type { WorkspaceMoveSource } from './session-move.js'
 import { trackScratchPlacement } from './scratch-placement.js'
 import type { WorkspacePlacementSource } from './scratch-placement.js'
@@ -19,6 +21,8 @@ export { createSessionDeleteActions, readSessionDeleteCapability } from './sessi
 export { createSessionMoveActions } from './session-move.js'
 export type { MoveWorkspace, WorkspaceMoveSource } from './session-move.js'
 export { createSessionCopyActions } from './session-menu.js'
+export { aggregateWorkspaceStatus, completionSucceeded } from './workspace-status.js'
+export type { WorkspaceStatusCounts } from './workspace-status.js'
 
 export { copyPayload, shortenSessionId, writeClipboard } from './clipboard.js'
 export { ChipPanelOverlay, createChipPanelActions, SessionIdChip } from './SessionIdChip.js'
@@ -33,7 +37,7 @@ export type { ScratchWorkspacePickerProps, ScratchPickerInjected } from './Scrat
  * dictionaries, and `uiWorkspace` is the client-side workspace service whose
  * native chooser the New-Session row uses. `workspaces` adopts the returned registry record.
  */
-export const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions']
+export const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions', 'uiSession', 'connection', 'remote', 'remote.session']
 
 /** The blank-session picker cell this half replaces, to add the scratch row. */
 const HERO_PICKER_SLOT = 'conversation.hero.workspace'
@@ -67,6 +71,13 @@ const STYLES = `
   white-space: normal; overflow-wrap: anywhere;
 }
 .dsh-sb-drop-target { outline: 2px solid var(--dsw-alias-brand-primary, #4f7cff); outline-offset: -2px; border-radius: 6px; }
+.dsh-sb-ws-status { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: auto; flex: none; white-space: nowrap; font-size: 11px; line-height: 1; color: var(--dsw-alias-label-secondary); }
+.dsh-sb-ws-item { display: inline-flex; align-items: center; gap: 3px; }
+.dsh-sb-ws-dot { inline-size: 6px; block-size: 6px; border-radius: 50%; background: currentColor; }
+.dsh-sb-ws-pending { color: #c67c00; }
+.dsh-sb-ws-running { color: #2f6bff; }
+.dsh-sb-ws-completed { color: #2e9e5b; }
+.dsh-sb-ws-idle, .dsh-sb-ws-unknown { color: var(--dsw-alias-label-secondary); }
 /*
  * One line, never shortened, always reachable.
  *
@@ -216,6 +227,9 @@ export interface ClientContextLike {
     create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
   }
   readonly sessions: SessionListReader
+  readonly uiSession?: WorkspaceStatusInjected['uiSession']
+  readonly connection?: WorkspaceStatusInjected['connection']
+  readonly remote?: WorkspaceStatusInjected['remote']
   effect(disposer: () => unknown, label?: string): void
 }
 
@@ -318,4 +332,16 @@ export function apply(ctx: ClientContextLike): void {
     name: 'shell.overlay', id: 'dsh-session-bridge.copy-notice', locale: NS,
     inject: () => ({ copyActions }),
   }, SessionCopyNotice))
+  if (ctx.uiSession !== undefined && ctx.connection !== undefined) {
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+      name: 'shell.overlay', id: 'dsh-session-bridge.workspace-status', locale: NS,
+      inject: () => ({
+        sessions: ctx.sessions as unknown as WorkspaceStatusInjected['sessions'],
+        workspaces: ctx.workspaces.list,
+        uiSession: ctx.uiSession as WorkspaceStatusInjected['uiSession'],
+        connection: ctx.connection as WorkspaceStatusInjected['connection'],
+        remote: ctx.remote as WorkspaceStatusInjected['remote'],
+      }),
+    }, WorkspaceStatusOverlay))
+  }
 }

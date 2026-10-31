@@ -327,3 +327,89 @@ it('shows the Host refusal reason and permits a later drag retry', async () => {
   assert.equal(actions.getSnapshot().phase, 'done')
   assert.equal(refreshed, 1)
 })
+
+it('aggregates native pending/running/completion facts without double-counting children', () => {
+  const statuses = new Map([
+    ['waiting', { pendingInteraction: { kind: 'approval' }, running: true }],
+    ['running', { running: true }],
+    ['completed', { completionUnread: true, running: false }],
+    ['failed', { completionUnread: true, running: false }],
+    ['parent-waiting', { pendingInteraction: { kind: 'question' }, running: false }],
+    ['child-running', { running: true }],
+    ['stale', { running: false }],
+    ['not-a-wait', { pendingInteraction: { kind: 'other' }, running: false }],
+    ['parent-child-wait', { pendingInteraction: { kind: 'approval' }, running: false }],
+    ['child-waiting', { pendingInteraction: { kind: 'question' }, running: true }],
+  ])
+  const list = {
+    phase: 'ready',
+    byId: {
+      waiting: { running: true }, running: { running: true }, completed: { running: false },
+      failed: { running: false }, 'parent-waiting': { running: false }, 'child-running': { running: true },
+      stale: { running: true }, 'not-a-wait': { running: false },
+      'parent-child-wait': { running: false }, 'child-waiting': { running: true },
+    },
+    ids: ['waiting', 'running', 'completed', 'failed', 'parent-waiting', 'child-running', 'stale', 'not-a-wait'],
+    projectionsBySession: {
+      'parent-waiting': { values: { subagentCatalog: [{ id: 'child-running' }] } },
+      'parent-child-wait': { values: { subagentCatalog: [{ id: 'child-waiting' }] } },
+    },
+  }
+  const plain = value => ({ ...value })
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(
+      ['waiting', 'running', 'completed', 'failed'], statuses, list, new Set(['completed']),
+    )),
+    { pending: 1, running: 1, completed: 1 },
+    'mixed states keep each real count; only the validated success is green',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['waiting'], statuses, list)),
+    { pending: 1, running: 0, completed: 0 },
+    'a waiting session that still reports running is not also counted as working for itself',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['parent-waiting'], statuses, list)),
+    { pending: 1, running: 1, completed: 0 },
+    'a waiting parent with a running child keeps the working count',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['parent-child-wait'], statuses, list)),
+    { pending: 1, running: 0, completed: 0 },
+    'a waiting child is not counted as running work',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['parent-waiting', 'child-running'], statuses, list)),
+    { pending: 1, running: 1, completed: 0 },
+    'a child that is also a member is folded into its parent once',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['stale', 'not-a-wait'], statuses, list)),
+    { pending: 0, running: 0, completed: 0 },
+    'stale true summary does not override a false status; unknown interaction kinds are not waits',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['completed'], statuses, { ...list, phase: 'pending' })),
+    { unknown: true, pending: 0, running: 0, completed: 0 },
+    'unsynchronized list is unknown, not idle or zero',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['completed'], statuses, list, new Set(), false)),
+    { unknown: true, pending: 0, running: 0, completed: 0 },
+    'missing connection generation is unknown',
+  )
+  assert.deepEqual(
+    plain(client.aggregateWorkspaceStatus(['missing'], statuses, list)),
+    { unknown: true, pending: 0, running: 0, completed: 0 },
+    'a workspace member absent from the synchronized list is unknown',
+  )
+})
+
+it('treats only completed turn/end as successful; cancel/error/interrupted are not green', () => {
+  const record = reason => [{ event: { type: 'turn/end', data: { reason: { kind: reason } } } }]
+  assert.equal(client.completionSucceeded(record('completed')), true)
+  for (const reason of ['aborted', 'error', 'blocked', 'interrupted', 'forked', 'max-tokens']) {
+    assert.equal(client.completionSucceeded(record(reason)), false, reason)
+  }
+  assert.equal(client.completionSucceeded([]), false, 'no completed turn is not success')
+})
