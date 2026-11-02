@@ -1,9 +1,9 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.9",
-  "candidateStatus": "0.1.9 is installed locally with the Remote Result fix and passed native workspace completion/read-clear acceptance. This record covers the validated source and prebuilt client; release assets are separate.",
+  "packageVersion": "0.1.10",
+  "candidateStatus": "0.1.9 is installed in the daily DSH; the 0.1.10 candidate removes the workspace activity badge entirely at the user’s request. Deletion, drag-and-drop move, and host lifecycle support are unchanged.",
   "hardHostVersionGate": false,
-  "change": "0.1.9 adds lightweight per-workspace activity badges: pending/running counts from the installed uiSession status, event-verified green completion (turn/end reason completed only), connection-generation unknown state, and child folding/deduplication. Existing deletion, drag move, host lifecycle and client registration are unchanged.",
+  "change": "0.1.10 removes the 0.1.9 workspace activity badge, its styles, tests, and uiSession/connection/remote integration. Deletion, drag-and-drop move, and host lifecycle support are unchanged.",
   "currentChecks": {
     "officialRc4ApiAudit": "exact npm 0.2.1-rc.4 declarations and runtime inspected; safe deletion API absent",
     "hostAndClientTypes": "passed: client typecheck once and fresh Host compilation",
@@ -206,24 +206,5 @@
     "dailyState": "Official session-controller/client remains enabled with the host-only lifecycle decorator and profile-level JSONL/workspace patches. Installing 0.1.9 preserved cordis.patch.yml bytes and all other dependency entries; the installed client matches the repaired build. All 71 pre-install session IDs remain present; the final list contains 72, and the additional session was not touched.",
     "clientDnd": "0.1.7 removes the move menu/picker. The user manually dragged the temporary session into Crodis in native Electron; Codex verified via RPC that the same ID/title/history prefix survived and workingDirectory became Crodis, then deleted that temporary session through the authenticated API. 0.1.8 only removes dead menu/probe remnants."
   },
-  "dailyInstalledVersion": "0.1.9",
-  "workspaceStatus": {
-    "source": "Installed uiSession.sessionStatus, Session list, workspaces and connection.generation.",
-    "completion": "Green requires Host completionUnread plus durable session/events last turn/end reason completed; aborted/error/blocked/interrupted/forked/max-tokens are not completion.",
-    "unknown": "connection.generation undefined or list not ready renders 状态未知.",
-    "counts": "pending kinds approval/plan-review/question; running uses status?.running ?? summary.running; parent/child members fold once; waiting parent with a waiting child is not counted running.",
-    "tests": "70 tests: 58 pass, 12 skip, 0 fail. React/JSDOM covers concurrent completion validation, mixed waiting/running priority, true Remote Result success and ok:false refusal. Earlier isolated cancel/error observations are supplemented by the unchanged turn/end reason tests; no new real cancel/error run after the Result repair.",
-    "remoteFix": "0.1.9 native acceptance showed idle while the native session row was completed. Root cause: remote.session.events returns a Result {ok,value} envelope, but the plugin read page.records directly; completion validation never saw the turn/end. Fixed to require ok===true and read value.records. Earlier claim that missing remote/remote.session injection caused the failure was not supported: ctx.get is valid without inject; explicit remote declarations are retained but are not the root cause. No polling, no false green.",
-    "nativeAcceptance": {
-      "date": "2026-10-31",
-      "host": "daily DSH 0.2.1-rc.4",
-      "installedVersion": "0.1.9",
-      "foldedRunning": "blue 工作中 · 1 observed; running logic unchanged by the later Result fix",
-      "foldedCompleted": "green 已完成 observed after real SB_GREEN_OK response on the final repaired build",
-      "viewed": "opening the completed session clears the workspace reminder to 空闲",
-      "startup": "native main UI and session list loaded",
-      "sessionIdsPreserved": 71,
-      "notRun": "No deliberate daily disconnect or real approval/question was triggered; those branches are covered by subscription/aggregation and controlled component checks."
-    }
-  }
+  "dailyInstalledVersion": "0.1.9"
 }

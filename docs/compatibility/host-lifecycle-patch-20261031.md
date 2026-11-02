@@ -333,3 +333,15 @@ Codex 随后调用已安装插件的鉴权删除接口清理该临时会话，�
 最终运行包为 dist/missher-dsh-session-bridge-0.1.9.tgz；日用安装使用同内容的
 0.1.9-result-fix.tgz 文件名以区分同版本候选。本文是安装后的验证记录，未为
 仅更新记录而重新构建运行包。
+
+## 0.1.10 移除工作区状态 badge
+
+用户确认该功能用不上，0.1.10 彻底移除工作区名称旁的实时状态 badge：
+
+- 删除 `workspace-status.tsx` 及 `shell.overlay` 注册；
+- 删除 `dsh-sb-ws-*` 样式；
+- 删除 `uiSession` / `connection` / `remote` / `remote.session` 客户端注入；
+- 删除对应聚合/Result 测试与 DOM 检查。
+
+删除会话、侧栏拖放移动和宿主生命周期接口未改动。0.1.9 的绿色/取消/失败
+验收记录保留为历史；0.1.10 不再显示任何工作区状态。
