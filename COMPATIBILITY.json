@@ -1,42 +1,21 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "0.1.10",
-  "candidateStatus": "0.1.10 is installed in the daily DSH and removes the workspace activity badge entirely at the user’s request. Deletion, drag-and-drop move, and host lifecycle support are unchanged.",
+  "packageVersion": "1.0.0",
+  "candidateStatus": "1.0.0 release: request-local catalog reuse, complete reference resolution and current workspace directories. Daily installation acceptance is recorded in the v1.0.0 release notes.",
   "hardHostVersionGate": false,
-  "change": "0.1.10 removes the 0.1.9 workspace activity badge, its styles, tests, and uiSession/connection/remote integration. Deletion, drag-and-drop move, and host lifecycle support are unchanged.",
+  "change": "Reuse one current catalog per read/send, filter before limiting results, resolve references across the complete Host listing, and use the effective workspace directory after moving. Existing UI and lifecycle operations are retained. Native prompt admission resumes the existing identity without creating an extra Session; targeted read-only projections supply the current directory when list metadata is stale.",
   "currentChecks": {
-    "officialRc4ApiAudit": "exact npm 0.2.1-rc.4 declarations and runtime inspected; safe deletion API absent",
-    "hostAndClientTypes": "passed: client typecheck once and fresh Host compilation",
-    "isolatedBuild": "passed",
-    "clientModuleLoad": "passed with static module stubs",
+    "hostTypesAndBuild": "passed: existing TypeScript compiler with tsconfig.build.json",
     "offlineTests": {
-      "passed": 56,
+      "passed": 65,
       "failed": 0,
       "skipped": 12,
       "cancelled": 0,
       "concurrency": 1
     },
-    "componentDom": "passed: existing menu and drag checks with real React/primitives and controlled stores; workspace status badge checks were removed with the feature",
-    "browserFixture": {
-      "deletionFlows": "passed in a real Codex in-app browser using the built plugin and synthetic responses",
-      "unsupportedAndFailedProbe": "visible, disabled, POST 0",
-      "post501": "visible reason; repeat confirmation disabled",
-      "cancelAndSyntheticSuccess": "cancel leaves POST unchanged; confirmed synthetic success increments it once",
-      "copyFeedback": "visible",
-      "clipboardRoundTrip": "not verified: Browser Use virtual clipboard was empty and paste was blocked; complete bytes verified by React/JSDOM only",
-      "consoleErrorsAndWarnings": 0,
-      "officialHost": false,
-      "nativeElectron": false
-    },
-    "officialRc4HostInstallation": "daily 0.2.1-rc.4 with profile-level persistence/workspace patches and lifecycle decorator; original controller/client kept enabled; app.asar unchanged",
-    "nativeElectron": "main UI, session list, model picker, removed move menu, delete confirmation/cancel verified by Codex; manual drag into Crodis confirmed by the user, then unchanged ID/title/history and target cwd independently verified via RPC; final delete button not clicked",
-    "realModelCalls": "passed: disposable test session produced a real response before move/delete verification",
-    "commandNote": "0.1.10 check: 56 pass, 0 fail, 12 existing SDK-dependent skips. Workspace status aggregation/Remote Result tests were removed with the feature. Existing delete/drag evidence is reused for unchanged code.",
-    "harnessFailureHistory": [
-      "global alert selector matched unrelated Copied Toast; scoped to deletion dialog",
-      "legacy header test VM lacked DOM globals; real JSDOM window/rAF/style provided; ResizeObserver remains an explicitly labelled inert test adapter",
-      "browser fixture stdin could not resolve JSX runtime; resolveDir bound to existing SDK ui-primitives"
-    ]
+    "regressions": "Nine added cases and strengthened checks pass after reproducing failures before the fixes. Native Host inspection corrected stale listing cwd assumptions and replaced create-based resume with native prompt admission, preserving bridge source and refusal semantics.",
+    "client": "Client source and bundle unchanged from 0.1.10; existing offline client checks pass, with 12 existing SDK-dependent chip tests skipped.",
+    "nativeAcceptance": "Recorded separately in the v1.0.0 GitHub release after installation. Historical Host/UI evidence remains below."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -169,7 +148,7 @@
       "details": "docs/compatibility/official-alpha5-20261017.md"
     }
   },
-  "checkedOn": "2026-10-31",
+  "checkedOn": "2026-11-05",
   "prior014Checks": {
     "hostAndClientTypes": "passed",
     "isolatedBuild": "passed",
@@ -203,8 +182,42 @@
     "hostPatch": "host-patches/20261031-session-lifecycle.patch (separate delivery, not installed, not in the plugin tgz)",
     "hostPatchVerification": "The profile-level runtime packages were installed into the daily desktop profile without touching app.asar or native components. Daily HTTP/storage verification covered ordinary and archived deletion (200, tombstoned), unconfirmed 400, real running-turn 409, and move to Crodis with real bash pwd plus reverse/forward moves; all 70 pre-existing sessions stayed intact. After finding that a tag-built controller dropped newer session/events, session/state and throughSeq-optional page behavior, the controller was rebuilt as a thin subclass of the installed controller that only adds lifecycle methods; isolated verification preserves events/page/state/wait, manages fork children, releases idle Agents, refuses running turns, and restores replaced methods on dispose. The client-safe controller/decorator profile was applied and the daily Electron UI was verified; the user then manually verified native drag move and Codex confirmed the result via RPC.",
     "clientRegistration": "The official session-controller row remains enabled; its dsh.client module registers ClientSessions and provides the browser sessions service. Daily Electron main UI, workspaces/session list and model selector were verified after the client registration fix.",
-    "dailyState": "Official session-controller/client remains enabled with the host-only lifecycle decorator and profile-level JSONL/workspace patches. Installing 0.1.10 preserved cordis.patch.yml bytes and all other dependency entries; the installed client matches the repaired build. All 71 pre-install session IDs remain present; the final list contains 72, and the additional session was not touched.",
+    "dailyState": "Historical 0.1.10 acceptance: Official session-controller/client remains enabled with the host-only lifecycle decorator and profile-level JSONL/workspace patches. Installing 0.1.10 preserved cordis.patch.yml bytes and all other dependency entries; the installed client matches the repaired build. All 71 pre-install session IDs remain present; the final list contains 72, and the additional session was not touched.",
     "clientDnd": "0.1.7 removes the move menu/picker. The user manually dragged the temporary session into Crodis in native Electron; Codex verified via RPC that the same ID/title/history prefix survived and workingDirectory became Crodis, then deleted that temporary session through the authenticated API. 0.1.8 only removes dead menu/probe remnants."
   },
-  "dailyInstalledVersion": "0.1.10"
+  "prior0110Checks": {
+    "officialRc4ApiAudit": "exact npm 0.2.1-rc.4 declarations and runtime inspected; safe deletion API absent",
+    "hostAndClientTypes": "passed: client typecheck once and fresh Host compilation",
+    "isolatedBuild": "passed",
+    "clientModuleLoad": "passed with static module stubs",
+    "offlineTests": {
+      "passed": 56,
+      "failed": 0,
+      "skipped": 12,
+      "cancelled": 0,
+      "concurrency": 1
+    },
+    "componentDom": "passed: existing menu and drag checks with real React/primitives and controlled stores; workspace status badge checks were removed with the feature",
+    "browserFixture": {
+      "deletionFlows": "passed in a real Codex in-app browser using the built plugin and synthetic responses",
+      "unsupportedAndFailedProbe": "visible, disabled, POST 0",
+      "post501": "visible reason; repeat confirmation disabled",
+      "cancelAndSyntheticSuccess": "cancel leaves POST unchanged; confirmed synthetic success increments it once",
+      "copyFeedback": "visible",
+      "clipboardRoundTrip": "not verified: Browser Use virtual clipboard was empty and paste was blocked; complete bytes verified by React/JSDOM only",
+      "consoleErrorsAndWarnings": 0,
+      "officialHost": false,
+      "nativeElectron": false
+    },
+    "officialRc4HostInstallation": "daily 0.2.1-rc.4 with profile-level persistence/workspace patches and lifecycle decorator; original controller/client kept enabled; app.asar unchanged",
+    "nativeElectron": "main UI, session list, model picker, removed move menu, delete confirmation/cancel verified by Codex; manual drag into Crodis confirmed by the user, then unchanged ID/title/history and target cwd independently verified via RPC; final delete button not clicked",
+    "realModelCalls": "passed: disposable test session produced a real response before move/delete verification",
+    "commandNote": "0.1.10 check: 56 pass, 0 fail, 12 existing SDK-dependent skips. Workspace status aggregation/Remote Result tests were removed with the feature. Existing delete/drag evidence is reused for unchanged code.",
+    "harnessFailureHistory": [
+      "global alert selector matched unrelated Copied Toast; scoped to deletion dialog",
+      "legacy header test VM lacked DOM globals; real JSDOM window/rAF/style provided; ResizeObserver remains an explicitly labelled inert test adapter",
+      "browser fixture stdin could not resolve JSX runtime; resolveDir bound to existing SDK ui-primitives"
+    ]
+  },
+  "previousDailyInstalledVersion": "0.1.10"
 }

@@ -11,7 +11,7 @@
  * @module dsh-session-bridge/delivery
  */
 
-import { describeSession, resolveSessionRef, sessionTitle } from './catalog.ts'
+import { listSessionRows, resolveSessionRef, type SessionRow } from './catalog.ts'
 import type { AgentLike, HostContext } from './dsh.ts'
 import { info, sessionControllerOf } from './dsh.ts'
 import { createBridgeMessage, frameBridgedText } from './message.ts'
@@ -47,21 +47,9 @@ export interface DeliveryPolicy {
 async function ensureLive(
   ctx: HostContext,
   sessionId: string,
-  cwd: string | undefined,
 ): Promise<{ readonly agent?: AgentLike; readonly woke: boolean; readonly reason?: string }> {
   const existing = ctx.agents?.get(sessionId)
   if (existing !== undefined) return { agent: existing, woke: false }
-
-  const controller = sessionControllerOf(ctx)
-  if (controller !== undefined && cwd !== undefined) {
-    try {
-      await controller.create({ sessionId, cwd })
-      const resumed = ctx.agents?.get(sessionId)
-      if (resumed !== undefined) return { agent: resumed, woke: true }
-    } catch (error) {
-      return { woke: false, reason: `could not resume session "${sessionId}": ${stringifyError(error)}` }
-    }
-  }
 
   if (ctx.agents === undefined) {
     return { woke: false, reason: 'this Host composition has no Agent registry, so a cold session cannot be woken' }
@@ -90,6 +78,7 @@ function stringifyError(error: unknown): string {
  * @param mode - `steer` interleaves at the nearest step boundary and wakes an
  *   idle target; `turn` always queues a distinct next turn.
  * @param policy - whether a cold receiver may be resumed.
+ * @param rows - optional listing already read by this command; never cached across operations.
  * @returns what actually happened, never throwing for an ordinary refusal.
  */
 export async function deliverToSession(
@@ -99,21 +88,21 @@ export async function deliverToSession(
   body: string,
   mode: DeliveryMode,
   policy: DeliveryPolicy,
+  rows?: readonly SessionRow[],
 ): Promise<DeliveryResult> {
   const refused = (reason: string, sessionId = reference): DeliveryResult =>
     ({ sessionId, reference, delivered: false, mode, woke: false, running: false, reason })
 
   if (body.trim().length === 0) return refused('the message body is empty')
 
-  const resolved = await resolveSessionRef(ctx, sender.id, reference)
+  const catalog = rows ?? await listSessionRows(ctx, sender.id)
+  const resolved = resolveSessionRef(catalog, reference)
   if (!resolved.ok) return refused(resolved.reason)
-  const targetId = resolved.sessionId
+  const targetId = resolved.session.sessionId
   if (targetId === sender.id) return refused('a session cannot bridge a message to itself', targetId)
 
-  const described = await describeSession(ctx, targetId)
-  if (described === undefined) return refused(`no session "${targetId}" exists in this Host`, targetId)
-
-  if (ctx.agents?.get(targetId) === undefined && !policy.wakeColdSessions) {
+  const wasLive = ctx.agents?.get(targetId) !== undefined
+  if (!wasLive && !policy.wakeColdSessions) {
     return refused(
       `session "${targetId}" is cold and this deployment does not wake cold sessions to deliver `
       + '(set wakeColdSessions to allow it)',
@@ -121,29 +110,42 @@ export async function deliverToSession(
     )
   }
 
-  const live = await ensureLive(ctx, targetId, described.cwd)
-  if (live.agent === undefined) return refused(live.reason ?? `session "${targetId}" could not be activated`, targetId)
-
-  const senderTitle = await sessionTitle(ctx, sender.id)
+  const senderTitle = catalog.find(row => row.sessionId === sender.id)?.title
   const text = frameBridgedText(body, sender.id, senderTitle)
   const message = createBridgeMessage(text, sender.id, senderTitle)
+  const commands = sessionControllerOf(ctx)?.commands
+  let woke = false
   try {
-    if (mode === 'turn') live.agent.followup(message)
-    else live.agent.steer(message)
+    if (typeof commands?.prompt === 'function') {
+      // Native prompt restores the original identity, preset and effective cwd.
+      // create() can mint a different Session and must never be used to resume.
+      const receipt = await commands.prompt({
+        requestId: message.id, sessionId: targetId,
+        mode: mode === 'turn' ? 'queue' : 'steer', content: message.content,
+      }, message.source)
+      if (receipt.accepted !== true) throw new Error('the Host did not accept the message')
+      woke = !wasLive
+    } else {
+      const live = await ensureLive(ctx, targetId)
+      if (live.agent === undefined) return refused(live.reason ?? `session "${targetId}" could not be activated`, targetId)
+      woke = live.woke
+      if (mode === 'turn') live.agent.followup(message)
+      else live.agent.steer(message)
+    }
   } catch (error) {
     return {
       sessionId: targetId,
       reference,
       delivered: false,
       mode,
-      woke: live.woke,
+      woke: woke || (!wasLive && ctx.agents?.get(targetId) !== undefined),
       running: false,
       reason: `session "${targetId}" rejected the message: ${stringifyError(error)}`,
     }
   }
   info(
     ctx,
-    `session-bridge: delivered a ${mode} message from "${sender.id}" to "${targetId}"${live.woke ? ' (resumed a cold session)' : ''}`,
+    `session-bridge: delivered a ${mode} message from "${sender.id}" to "${targetId}"${woke ? ' (resumed a cold session)' : ''}`,
   )
-  return { sessionId: targetId, reference, delivered: true, mode, woke: live.woke, running: true }
+  return { sessionId: targetId, reference, delivered: true, mode, woke, running: true }
 }

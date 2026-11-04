@@ -61,13 +61,12 @@ export interface Transcript {
  * live-preferred corpus, which yields every identity but no titles.
  *
  * @param ctx - Host context.
- * @param selfId - the asking Session's id, marked `self` and excluded from `others`.
- * @param limit - maximum rows returned.
- * @returns at most `limit` rows ordered newest first.
+ * @param selfId - the asking Session's id, marked `self` and sorted first.
+ * @returns all rows; callers apply display limits after filtering or resolving.
  * @throws when this Host provides neither listing seam, rather than reporting
  * an empty Host: "no Sessions" and "cannot see Sessions" must stay distinct.
  */
-export declare function listSessionRows(ctx: HostContext, selfId: string, limit: number): Promise<SessionRow[]>;
+export declare function listSessionRows(ctx: HostContext, selfId: string): Promise<SessionRow[]>;
 /**
  * Project one Session's current model-visible conversation into bounded turns.
  *
@@ -76,23 +75,16 @@ export declare function listSessionRows(ctx: HostContext, selfId: string, limit:
  * file reads.
  *
  * @param ctx - Host context.
- * @param sessionId - the Session to read.
+ * @param session - the resolved row from this operation's current Host listing.
  * @param maxTurns - maximum retained turns, newest kept.
  * @returns the bounded transcript.
  * @throws when the Session is unknown to the Host.
  */
-export declare function readTranscript(ctx: HostContext, sessionId: string, maxTurns: number): Promise<Transcript>;
-/**
- * Resolve a Session's title without reading its log, for message framing.
- * @param ctx - Host context.
- * @param sessionId - the Session to name.
- * @returns the latest title, or `undefined`.
- */
-export declare function sessionTitle(ctx: HostContext, sessionId: string): Promise<string | undefined>;
+export declare function readTranscript(ctx: HostContext, session: SessionRow, maxTurns: number): Promise<Transcript>;
 /** One resolved Session reference. */
 export type SessionRefResolution = {
     readonly ok: true;
-    readonly sessionId: string;
+    readonly session: SessionRow;
     readonly how: 'id' | 'title' | 'prefix';
 } | {
     readonly ok: false;
@@ -107,21 +99,10 @@ export type SessionRefResolution = {
  * case-insensitive title, then a unique id prefix. An ambiguous title or
  * prefix is refused with the candidates rather than guessed at.
  *
- * @param ctx - Host context.
- * @param selfId - the asking Session, excluded from matching.
+ * @param rows - the complete listing already read for this operation.
  * @param reference - an id, a title, or an id prefix.
- * @returns the exact Session id, or the reason no single one was meant.
+ * @returns the matched Session row, or the reason no single one was meant.
  */
-export declare function resolveSessionRef(ctx: HostContext, selfId: string, reference: string): Promise<SessionRefResolution>;
-/**
- * Describe one live-or-durable Session well enough to address a message to it.
- * @param ctx - Host context.
- * @param sessionId - the Session to describe.
- * @returns the Session's cwd and title, or `undefined` when the Host does not know it.
- */
-export declare function describeSession(ctx: HostContext, sessionId: string): Promise<{
-    readonly cwd?: string;
-    readonly title?: string;
-} | undefined>;
+export declare function resolveSessionRef(rows: readonly SessionRow[], reference: string): SessionRefResolution;
 /** Read one live Agent's own header for the asking Session. */
 export declare function selfHeader(agent: AgentLike | undefined): SessionHeaderLike | undefined;

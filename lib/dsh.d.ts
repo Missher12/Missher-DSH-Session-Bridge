@@ -70,6 +70,26 @@ export interface SessionQueryLike {
 }
 /** The `ctx.sessionController` slice: the Host's own Session creation path. */
 export interface SessionControllerLike {
+    /** Current targeted projections; unlike list metadata, these observe the stored log. */
+    projections?(request: {
+        readonly sessionId: string;
+    }, signal: AbortSignal): Promise<{
+        readonly values?: Readonly<Record<string, unknown>>;
+    } | null>;
+    /** Local Host admission preserves bridge attribution; the public RPC prompt supplies a user source. */
+    readonly commands?: {
+        prompt(request: {
+            readonly requestId: string;
+            readonly sessionId: string;
+            readonly mode: 'steer' | 'queue';
+            readonly content: readonly {
+                readonly type: 'text';
+                readonly text: string;
+            }[];
+        }, source?: unknown): Promise<{
+            readonly accepted: boolean;
+        }>;
+    };
     /** Host-owned permanent deletion of any Session, present only in patched/newer Hosts. */
     deleteSession?(sessionId: string): Promise<void>;
     /** Host-owned permanent deletion of an archived Session, present only in patched Hosts. */

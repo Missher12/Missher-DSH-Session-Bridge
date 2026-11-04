@@ -66,7 +66,7 @@ export function registerBridgeCommands(ctx: HostContext, policy: ToolPolicy): vo
       const selfId = invocation.agent?.id ?? ''
       let rows: Awaited<ReturnType<typeof listSessionRows>>
       try {
-        rows = await listSessionRows(ctx, selfId, 200)
+        rows = await listSessionRows(ctx, selfId)
       } catch (error) {
         // A Host that cannot list sessions at all is a different answer from a
         // Host with no sessions, and the human reading the command result is the
@@ -126,14 +126,16 @@ export function registerBridgeCommands(ctx: HostContext, policy: ToolPolicy): vo
       // not the first whitespace: the longest leading token span that resolves
       // to exactly one session wins, and everything after it is the body.
       const tokens = raw.split(/\s+/)
+      if (tokens.length < 2) return { kind: 'error', text: 'Usage: /bridge <session-id | title> <message>' }
+      const rows = await listSessionRows(ctx, agent.id)
       let target: string | undefined
       let body = ''
       for (let span = tokens.length - 1; span >= 1; span -= 1) {
         const candidate = tokens.slice(0, span).join(' ')
         const remaining = tokens.slice(span).join(' ')
         if (remaining.length === 0) continue
-        const probe = await resolveSessionRef(ctx, agent.id, candidate)
-        if (probe.ok && probe.sessionId !== agent.id) {
+        const probe = resolveSessionRef(rows, candidate)
+        if (probe.ok && probe.session.sessionId !== agent.id) {
           target = candidate
           body = remaining
           break
@@ -142,16 +144,14 @@ export function registerBridgeCommands(ctx: HostContext, policy: ToolPolicy): vo
       if (target === undefined) {
         return {
           kind: 'error',
-          text: raw.search(/\s/) < 0
-            ? 'Usage: /bridge <session-id | title> <message>'
-            : `No single session matches the start of "${raw}". Use /sessions to list ids and titles.`,
+          text: `No single session matches the start of "${raw}". Use /sessions to list ids and titles.`,
         }
       }
       if (body.length > policy.maxMessageChars) {
         return { kind: 'error', text: `Message exceeds ${policy.maxMessageChars} characters.` }
       }
       const mode: DeliveryMode = 'steer'
-      const result = await deliverToSession(ctx, agent, target, body, mode, { wakeColdSessions: policy.wakeColdSessions })
+      const result = await deliverToSession(ctx, agent, target, body, mode, { wakeColdSessions: policy.wakeColdSessions }, rows)
       if (!result.delivered) {
         return { kind: 'error', text: `Not delivered to ${result.sessionId}: ${result.reason ?? 'unknown reason'}` }
       }

@@ -71,7 +71,13 @@ function fakeHost({ summaries, surfacesById, agents, scratchRoot }) {
         return { agent }
       },
     },
-    sessions: { get: id => surfacesById.get(id), list: () => [] },
+    sessions: {
+      get: id => {
+        const snapshot = surfacesById.get(id)
+        return snapshot === undefined ? undefined : { header: snapshot.session }
+      },
+      list: () => [],
+    },
     sessionController: {
       list: async () => ({ items: summaries }),
       create: async (request) => {
@@ -168,6 +174,19 @@ function hostFixture(overrides = {}) {
   return { ...fixture, agents, surfacesById }
 }
 
+async function largeHostFixture() {
+  const fixture = hostFixture()
+  const { items } = await fixture.host.sessionController.list({})
+  const peer = items.find(row => row.sessionId === PEER)
+  items.push(...Array.from({ length: 501 }, (_, index) => ({
+    ...peer,
+    sessionId: `session-extra-${index}`,
+    updatedAt: 1_500,
+    projections: { values: { title: `Extra ${index}` } },
+  })))
+  return { ...fixture, items }
+}
+
 /* ------------------------------------------------------------------ tests */
 
 describe('session bridge host half', () => {
@@ -204,6 +223,37 @@ describe('session bridge host half', () => {
     assert.ok(withChildren.sessions.some(row => row.session_id === 'session-sub-7777'))
   })
 
+  it('session_list filters children before applying the requested limit', async () => {
+    const { host, registeredTools, agents } = hostFixture()
+    const { items } = await host.sessionController.list({})
+    items.find(row => row.origin === 'subagent').updatedAt = 10_000
+    const result = await callTool(registeredTools, 'session_list', { limit: 2 }, agents.get(SELF))
+    assert.deepEqual(result.sessions.map(row => row.session_id), [SELF, PEER])
+    assert.equal(result.truncated, true)
+  })
+
+  it('session_list prefers a projected directory over the original header directory', async () => {
+    const { host, registeredTools, agents } = hostFixture()
+    const { items } = await host.sessionController.list({})
+    items.find(row => row.sessionId === PEER).projections.values.workingDirectory = '/tmp/moved-workspace'
+    const result = await callTool(registeredTools, 'session_list', {}, agents.get(SELF))
+    assert.equal(result.sessions.find(row => row.session_id === PEER).cwd, '/tmp/moved-workspace')
+  })
+
+  it('session_list reports truncation only when matching sessions were omitted', async () => {
+    const { registeredTools, agents } = hostFixture()
+    for (const [args, count, truncated] of [
+      [{}, 5, false],
+      [{ limit: 5 }, 5, false],
+      [{ limit: 6, include_subagents: true }, 6, false],
+      [{ limit: 2, include_subagents: true }, 2, true],
+    ]) {
+      const result = await callTool(registeredTools, 'session_list', args, agents.get(SELF))
+      assert.equal(result.sessions.length, count)
+      assert.equal(result.truncated, truncated)
+    }
+  })
+
   it('session_read projects user and assistant turns by exact id', async () => {
     const { registeredTools, agents } = hostFixture()
     const value = await callTool(registeredTools, 'session_read', { session_id: PEER }, agents.get(SELF))
@@ -212,6 +262,20 @@ describe('session bridge host half', () => {
     assert.equal(value.total_turns, 2)
     assert.deepEqual(value.turns.map(turn => turn.role), ['user', 'assistant'])
     assert.match(value.turns[0].text, /parser/)
+  })
+
+  it('session_read uses the current directory after a workspace move', async () => {
+    const { host, registeredTools, agents } = hostFixture()
+    // The real Host keeps the original cwd in the header and may cache an old
+    // listing projection after a move. Its targeted projection reads the log.
+    host.sessionController.projections = async ({ sessionId }, signal) => {
+      signal.throwIfAborted()
+      assert.equal(sessionId, COLD)
+      return { kind: 'sequenced', asOfSeq: 30, values: { workingDirectory: '/tmp/moved-workspace' } }
+    }
+    const value = await callTool(registeredTools, 'session_read', { session_id: COLD }, agents.get(SELF))
+    assert.equal(value.cwd, '/tmp/moved-workspace')
+    assert.equal(value.turns[0].text, 'old question')
   })
 
   it('session_read retains only the newest turns when capped', async () => {
@@ -230,6 +294,27 @@ describe('session bridge host half', () => {
     assert.equal(byPrefix.session_id, COLD)
   })
 
+  it('resolves older sessions beyond the first 500 rows', async () => {
+    const { registeredTools, agents } = await largeHostFixture()
+    for (const reference of [COLD, 'Cold session', 'session-cold']) {
+      const value = await callTool(registeredTools, 'session_read', { session_id: reference }, agents.get(SELF))
+      assert.equal(value.session_id, COLD)
+      assert.equal(value.turns[0].text, 'old question')
+    }
+  })
+
+  it('refuses delivery when a title or prefix has an older duplicate beyond 500 rows', async () => {
+    deliveries.length = 0
+    const { registeredTools, agents, items } = await largeHostFixture()
+    items.push({ ...items.find(row => row.sessionId === PEER), sessionId: 'session-peer-duplicate', updatedAt: 0 })
+    for (const reference of ['Peer session', 'session-peer']) {
+      const result = await callTool(registeredTools, 'session_send', { session_id: reference, message: 'hello' }, agents.get(SELF))
+      assert.equal(result.delivered, false)
+      assert.match(result.reason, /names 2 sessions|ambiguous id prefix matching 2 sessions/)
+    }
+    assert.equal(deliveries.length, 0)
+  })
+
   it('refuses an unresolvable or ambiguous reference instead of guessing', async () => {
     const { registeredTools, agents } = hostFixture()
     await assert.rejects(
@@ -244,7 +329,10 @@ describe('session bridge host half', () => {
 
   it('session_send steers a live peer and frames the message for it', async () => {
     deliveries.length = 0
-    const { registeredTools, agents } = hostFixture()
+    const { host, registeredTools, agents } = hostFixture()
+    const list = host.sessionController.list
+    let listCalls = 0
+    host.sessionController.list = async () => { listCalls += 1; return list() }
     const value = await callTool(registeredTools, 'session_send', { session_id: 'Peer session', message: 'status?' }, agents.get(SELF))
     assert.equal(value.delivered, true)
     assert.equal(value.session_id, PEER)
@@ -259,6 +347,7 @@ describe('session bridge host half', () => {
     assert.equal(delivery.message.source.senderTitle, 'Primary work')
     assert.match(delivery.message.content[0].text, /relayed from another DeepSeek Harness session/)
     assert.match(delivery.message.content[0].text, /status\?/)
+    assert.equal(listCalls, 1, 'one catalog query serves target resolution and sender attribution')
   })
 
   it('session_send queues a distinct turn in turn mode', async () => {
@@ -275,6 +364,46 @@ describe('session bridge host half', () => {
     assert.equal(value.delivered, true)
     assert.equal(value.woke, true)
     assert.equal(deliveries[0].id, COLD)
+  })
+
+  it('session_send resumes a moved session in its current workspace', async () => {
+    deliveries.length = 0
+    const { host, registeredTools, agents } = hostFixture()
+    const originalCount = agents.size
+    host.sessionController.create = async () => { throw new Error('create is not a resume operation') }
+    host.agents.resume = async () => { throw new Error('native prompt must own resume/preset setup') }
+    host.sessionController.commands = { prompt: async (request, source) => {
+      assert.equal(request.sessionId, COLD)
+      assert.equal(request.mode, 'queue')
+      assert.equal(typeof request.requestId, 'string')
+      assert.equal(source.kind, 'session-bridge')
+      assert.equal(source.senderSessionId, SELF)
+      assert.match(request.content[0].text, /continue/)
+      const agent = fakeAgent(COLD, '/tmp/moved-workspace')
+      agents.set(COLD, agent)
+      agent.followup({ role: 'user', content: request.content, source })
+      return { accepted: true }
+    } }
+    const value = await callTool(registeredTools, 'session_send', { session_id: COLD, message: 'continue', mode: 'turn' }, agents.get(SELF))
+    assert.equal(value.delivered, true)
+    assert.equal(value.woke, true)
+    assert.equal(agents.get(COLD).session.header.cwd, '/tmp/moved-workspace')
+    assert.equal(deliveries[0].id, COLD)
+    assert.equal(agents.size, originalCount + 1, 'only the original cold identity is resumed')
+  })
+
+  it('session_send preserves a native prompt refusal without falling back or retrying', async () => {
+    deliveries.length = 0
+    const { host, registeredTools, agents } = hostFixture()
+    host.sessionController.commands = { prompt: async (request, source) => {
+      assert.equal(request.mode, 'steer')
+      assert.equal(source.senderSessionId, SELF)
+      throw new Error('session/writer-held')
+    } }
+    const value = await callTool(registeredTools, 'session_send', { session_id: PEER, message: 'status?' }, agents.get(SELF))
+    assert.equal(value.delivered, false)
+    assert.match(value.reason, /session\/writer-held/)
+    assert.equal(deliveries.length, 0)
   })
 
   it('session_send refuses a cold session when the policy forbids waking it', async () => {
@@ -329,17 +458,31 @@ describe('session bridge host half', () => {
     assert.match(result.text, /you/)
   })
 
+  it('the /sessions command searches older sessions before limiting output', async () => {
+    const { registeredCommands, agents } = await largeHostFixture()
+    const result = await registeredCommands.get('sessions').handler({
+      agent: agents.get(SELF), rawInput: 'Cold session', signal: new AbortController().signal,
+    })
+    assert.equal(result.kind, 'success')
+    assert.match(result.text, new RegExp(COLD))
+  })
+
   it('the /bridge command delivers and reports the resolved id', async () => {
     deliveries.length = 0
-    const { registeredCommands, agents } = hostFixture()
+    const { host, registeredCommands, agents } = hostFixture()
+    const list = host.sessionController.list
+    let listCalls = 0
+    host.sessionController.list = async () => { listCalls += 1; return list() }
     const result = await registeredCommands.get('bridge').handler({
       agent: agents.get(SELF),
-      rawInput: 'Peer session  ping',
+      rawInput: 'Peer session  please check the parser and send the result back',
       signal: new AbortController().signal,
     })
     assert.equal(result.kind, 'success')
     assert.match(result.text, new RegExp(`Delivered to ${PEER}`))
     assert.equal(deliveries[0].id, PEER)
+    assert.match(deliveries[0].message.content[0].text, /please check the parser and send the result back/)
+    assert.equal(listCalls, 1, 'title parsing and delivery share one catalog query')
   })
 
   it('the /bridge command reports a usage error rather than throwing', async () => {

@@ -10,6 +10,7 @@
  *
  * @module dsh-session-bridge/delivery
  */
+import { type SessionRow } from './catalog.ts';
 import type { AgentLike, HostContext } from './dsh.ts';
 /** How a bridged message enters the target Session's turn machinery. */
 export type DeliveryMode = 'steer' | 'turn';
@@ -45,6 +46,7 @@ export interface DeliveryPolicy {
  * @param mode - `steer` interleaves at the nearest step boundary and wakes an
  *   idle target; `turn` always queues a distinct next turn.
  * @param policy - whether a cold receiver may be resumed.
+ * @param rows - optional listing already read by this command; never cached across operations.
  * @returns what actually happened, never throwing for an ordinary refusal.
  */
-export declare function deliverToSession(ctx: HostContext, sender: AgentLike, reference: string, body: string, mode: DeliveryMode, policy: DeliveryPolicy): Promise<DeliveryResult>;
+export declare function deliverToSession(ctx: HostContext, sender: AgentLike, reference: string, body: string, mode: DeliveryMode, policy: DeliveryPolicy, rows?: readonly SessionRow[]): Promise<DeliveryResult>;
