@@ -1,6 +1,6 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.1",
+  "packageVersion": "1.0.2",
   "candidateStatus": "1.0.1 release. Daily installation and native acceptance are recorded in the v1.0.1 release notes.",
   "hardHostVersionGate": false,
   "change": "Reject ambiguous slash-command recipients, preserve message formatting, copy the clicked session’s current directory and defer to the native copy-ID menu action when present.",
