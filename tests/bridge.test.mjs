@@ -473,16 +473,38 @@ describe('session bridge host half', () => {
     const list = host.sessionController.list
     let listCalls = 0
     host.sessionController.list = async () => { listCalls += 1; return list() }
+    const body = '  第一行\r\n    第二行\n\n末尾  \n'
     const result = await registeredCommands.get('bridge').handler({
       agent: agents.get(SELF),
-      rawInput: 'Peer session  please check the parser and send the result back',
+      rawInput: 'Peer   session ' + body,
       signal: new AbortController().signal,
     })
     assert.equal(result.kind, 'success')
     assert.match(result.text, new RegExp(`Delivered to ${PEER}`))
     assert.equal(deliveries[0].id, PEER)
-    assert.match(deliveries[0].message.content[0].text, /please check the parser and send the result back/)
+    assert.ok(deliveries[0].message.content[0].text.endsWith('\n---\n' + body + '\n</session-bridge-message>'))
     assert.equal(listCalls, 1, 'title parsing and delivery share one catalog query')
+  })
+
+  it('the /bridge command refuses an ambiguous longer title without delivering to its shorter prefix', async () => {
+    deliveries.length = 0
+    const { host, registeredCommands, agents } = hostFixture()
+    const { items } = await host.sessionController.list({})
+    const peer = items.find(row => row.sessionId === PEER)
+    peer.projections.values.title = '开发'
+    for (const id of ['session-plan-a', 'session-plan-b']) {
+      items.push({ ...peer, sessionId: id, projections: { values: { title: '开发 计划' } } })
+    }
+    const run = rawInput => registeredCommands.get('bridge').handler({ agent: agents.get(SELF), rawInput })
+    const refused = await run('开发 计划 同步进度')
+    assert.equal(refused.kind, 'error')
+    assert.match(refused.text, /session-plan-a/)
+    assert.match(refused.text, /session-plan-b/)
+    assert.equal((await run('开发 计划')).kind, 'error', 'a title on its own has no body')
+    assert.deepEqual(deliveries, [])
+    items.push({ ...peer, sessionId: 'session-decoy', projections: { values: { title: PEER + ' 同步' } } })
+    assert.equal((await run(PEER + ' 同步 进度')).kind, 'success')
+    assert.equal(deliveries[0].id, PEER, 'an explicit ID must always disambiguate')
   })
 
   it('the /bridge command reports a usage error rather than throwing', async () => {

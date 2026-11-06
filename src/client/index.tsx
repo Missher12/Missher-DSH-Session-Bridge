@@ -6,7 +6,7 @@ import { en, NS, zh } from './locales.js'
 import { SCRATCH_PATH, scratchWorkspace } from '../scratch-wire.js'
 import type { ScratchResult } from '../scratch-wire.js'
 import { createSessionCopyActions, SessionCopyMenuItem, SessionCopyNotice } from './session-menu.js'
-import type { SessionCopyKind, SessionListReader } from './session-menu.js'
+import type { SessionCopyKind, SessionListReader, SessionProjectionReader } from './session-menu.js'
 
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
 import { createSessionMoveActions, SessionMoveToast } from './session-move.js'
@@ -62,10 +62,13 @@ const STYLE_ID = 'dsh-session-bridge-styles'
  */
 const STYLES = `
 .dsh-sb-deleteHint {
-  box-sizing: border-box; max-inline-size: min(280px, 100%); padding: 4px 12px 8px;
-  color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.5;
+  box-sizing: border-box; max-inline-size: min(280px, calc(100% - 16px)); margin: 4px 8px; padding: 8px 12px;
+  border-radius: 6px; background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 1.5;
   white-space: normal; overflow-wrap: anywhere;
 }
+.dsh-sb-deleteSessionId { display: block; padding: 10px 12px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: 13px/1.6 ui-monospace, SFMono-Regular, monospace; overflow-wrap: anywhere; }
+.dsh-sb-deleteError { color: var(--dsw-alias-state-error-primary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .dsh-sb-drop-target { outline: 2px solid var(--dsw-alias-brand-primary, #4f7cff); outline-offset: -2px; border-radius: 6px; }
 /*
  * One line, never shortened, always reachable.
@@ -141,16 +144,16 @@ const STYLES = `
  */
 .dsh-sbc-panel {
   box-sizing: border-box; z-index: 60;
-  padding: 10px 12px 12px;
-  border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--dsw-alias-border-l1); border-radius: 10px;
   background: var(--dsw-alias-bg-overlay);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+  box-shadow: var(--dsw-elevation-soft, 0 8px 24px rgb(0 0 0 / 10%));
   display: flex; flex-direction: column; gap: 10px;
   overflow-y: auto; overflow-x: hidden;
   white-space: normal; text-align: start;
 }
 .dsh-sbc-panelTitle {
-  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 15px; line-height: 22px; font-weight: 600;
   color: var(--dsw-alias-label-secondary);
 }
 .dsh-sbc-row { display: flex; flex-direction: column; gap: 4px; min-inline-size: 0; }
@@ -216,6 +219,7 @@ export interface ClientContextLike {
     create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
   }
   readonly sessions: SessionListReader
+  get?(name: 'remote.session'): SessionProjectionReader | undefined
   effect(disposer: () => unknown, label?: string): void
 }
 
@@ -274,7 +278,7 @@ export function apply(ctx: ClientContextLike): void {
   if (registerTrailing !== undefined) {
     ctx.effect(() => trackScratchPlacement(ctx.workspaces.list, picker.findScratchWorkspace, registerTrailing), 'session-bridge: trailing workspace placement')
   }
-  const copyActions = createSessionCopyActions(ctx.sessions)
+  const copyActions = createSessionCopyActions(ctx.sessions, undefined, () => ctx.get?.('remote.session'))
   const refreshSessions = (): void => {
     try { ctx.sessions.refresh?.() } catch { /* refresh is best-effort */ }
   }
@@ -298,7 +302,9 @@ export function apply(ctx: ClientContextLike): void {
   const menu = 'sidebar.workspaces.session.menu.item'
   for (const [index, kind] of (['id', 'cwd', 'bridge'] as const).entries()) {
     ctx.slots.inject(menu, () => ctx.slots.register({
-      name: menu, id: `dsh-session-bridge.copy-${kind}`, order: 500 + index * 10, locale: NS,
+      name: menu, order: 500 + index * 10, locale: NS,
+      // Share the native cell. Its default priority (0) wins while mounted.
+      ...(kind === 'id' ? { id: 'session-id', priority: 1 } : { id: `dsh-session-bridge.copy-${kind}` }),
       inject: (): { kind: SessionCopyKind; copyReference: typeof copyActions.copy } => ({ kind, copyReference: copyActions.copy }),
     }, SessionCopyMenuItem))
   }

@@ -304,7 +304,7 @@ export function resolveSessionRef(
     return { ok: true, session: only, how: 'title' }
   }
   if (byTitle.length > 1) {
-    return { ok: false, reason: `"${wanted}" names ${byTitle.length} sessions: ${byTitle.map(row => row.sessionId).join(', ')}` }
+    return { ok: false, reason: `"${wanted}" names ${byTitle.length} sessions. Use a full session ID: ${byTitle.map(row => row.sessionId).join(', ')}` }
   }
 
   const byPrefix = rows.filter(row => row.sessionId.startsWith(wanted))
@@ -313,7 +313,7 @@ export function resolveSessionRef(
     return { ok: true, session: only, how: 'prefix' }
   }
   if (byPrefix.length > 1) {
-    return { ok: false, reason: `"${wanted}" is an ambiguous id prefix matching ${byPrefix.length} sessions: ${byPrefix.slice(0, 5).map(row => row.sessionId).join(', ')}` }
+    return { ok: false, reason: `"${wanted}" is an ambiguous id prefix matching ${byPrefix.length} sessions. Use a full session ID: ${byPrefix.slice(0, 5).map(row => row.sessionId).join(', ')}` }
   }
   return { ok: false, reason: `no session id, title, or id prefix matches "${wanted}"` }
 }

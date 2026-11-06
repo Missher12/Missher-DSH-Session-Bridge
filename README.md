@@ -4,30 +4,30 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**1.0.0**（侧栏拖放移动和删除会话，依赖宿主生命周期接口）。
+- 包名：`@missher/dsh-session-bridge`；版本：**1.0.1**（侧栏拖放移动和删除会话，依赖宿主生命周期接口）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
 - [许可证](LICENSE) · [上游署名](THIRD_PARTY_NOTICES.md) · [兼容记录](COMPATIBILITY.json)
 
-1.0.0 在一次读取或投递中复用当前会话列表，修复先限量后过滤造成的漏项、旧会话引用与重名漏判，读取时查询当前目录投影；投递通过宿主原生消息入口恢复原会话，避免误建新会话。原有跨会话工具、命令、scratch、删除与拖放移动均保留。
+1.0.1 修复了多词会话标题重名时的误投。用完整 ID 可直接指定目标，投递保留正文换行、缩进和尾部空白。侧栏按点击的会话读取当前工作目录，并优先显示宿主的复制 ID 操作。
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.0，下载 `missher-dsh-session-bridge-1.0.0.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.1，下载 `missher-dsh-session-bridge-1.0.1.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/<tag>/missher-dsh-session-bridge-1.0.0.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.1/missher-dsh-session-bridge-1.0.1.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.0.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.1.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -36,7 +36,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.0.
 
 ### 会话 ID 与菜单
 
-在左侧找到目标会话，点击该行的三点菜单，选择“复制会话 ID”。复制结果保留完整 `session-` 前缀；菜单也能复制工作目录或 `/bridge <session-id> ` 引用。顶部只保留会话标题和其他操作，不再显示重复的 ID 控件或详情浮层。
+在左侧目标会话行打开三点菜单。当前 DSH 显示“复制 Session ID”，缺少原生入口的宿主由插件提供“复制会话 ID”。两者都保留完整的 `session-` 前缀。菜单还可复制当前工作目录或 `/bridge <session-id> ` 引用。
 
 操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。宿主提供 `sessionController.deleteSession`（或旧的 `deleteArchivedSession`）与 `sessionController.moveSession` 时，删除进入确认，拖放调用同一移动事务；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。宿主缺少对应原子接口时删除入口禁用并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
 
@@ -87,7 +87,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.0.
 
 没有宿主版本号硬限制：判定按能力，不按版本号。开发 SDK 的 rc.2 pin 只是开发链接，不是兼容范围门禁。
 
-以下为 0.1.3 的历史验证记录，不代表 1.0.0 已完成相同验收。2026-10-14 在 Linux x64 / Node 22.22.1 上实测两套 **Missher 社区发行版**（都是为该桌面产品改过的构建，不是未经改动的官方版）：
+以下为 0.1.3 的历史验证记录，不代表 1.0.1 已完成相同验收。2026-10-14 在 Linux x64 / Node 22.22.1 上实测两套 **Missher 社区发行版**（都是为该桌面产品改过的构建，不是未经改动的官方版）：
 
 | | DSH 0.2.0-rc.2 / Cordis 4.0.4 | DSH 0.2.1-alpha.2 / Cordis 4.0.5-alpha.1（desktop 0.2.1-alpha.2.20261014.1） |
 | --- | --- | --- |
@@ -169,7 +169,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.0.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.1.tgz
 ```
 
 SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。

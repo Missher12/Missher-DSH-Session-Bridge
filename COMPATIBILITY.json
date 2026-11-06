@@ -1,21 +1,21 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.0",
-  "candidateStatus": "1.0.0 release: request-local catalog reuse, complete reference resolution and current workspace directories. Daily installation acceptance is recorded in the v1.0.0 release notes.",
+  "packageVersion": "1.0.1",
+  "candidateStatus": "1.0.1 release. Daily installation and native acceptance are recorded in the v1.0.1 release notes.",
   "hardHostVersionGate": false,
-  "change": "Reuse one current catalog per read/send, filter before limiting results, resolve references across the complete Host listing, and use the effective workspace directory after moving. Existing UI and lifecycle operations are retained. Native prompt admission resumes the existing identity without creating an extra Session; targeted read-only projections supply the current directory when list metadata is stale.",
+  "change": "Reject ambiguous slash-command recipients, preserve message formatting, copy the clicked session’s current directory and defer to the native copy-ID menu action when present.",
   "currentChecks": {
-    "hostTypesAndBuild": "passed: existing TypeScript compiler with tsconfig.build.json",
+    "check": "pnpm run check passed: strict Host/client types, both builds, client Loader check and offline tests.",
     "offlineTests": {
-      "passed": 65,
+      "passed": 67,
       "failed": 0,
       "skipped": 12,
       "cancelled": 0,
       "concurrency": 1
     },
-    "regressions": "Nine added cases and strengthened checks pass after reproducing failures before the fixes. Native Host inspection corrected stale listing cwd assumptions and replaced create-based resume with native prompt admission, preserving bridge source and refusal semantics.",
-    "client": "Client source and bundle unchanged from 0.1.10; existing offline client checks pass, with 12 existing SDK-dependent chip tests skipped.",
-    "nativeAcceptance": "Recorded separately in the v1.0.0 GitHub release after installation. Historical Host/UI evidence remains below."
+    "regressions": "The four focused checks failed on 1.0.0 and passed after fixing recipient selection, multiline body preservation, current-directory lookup and copy-ID slot fallback.",
+    "skips": "12 pre-existing chip tests require a full Host SDK checkout with React/JSDOM.",
+    "nativeAcceptance": "Recorded in the v1.0.1 GitHub release after daily installation."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -148,7 +148,7 @@
       "details": "docs/compatibility/official-alpha5-20261017.md"
     }
   },
-  "checkedOn": "2026-11-05",
+  "checkedOn": "2026-11-07",
   "prior014Checks": {
     "hostAndClientTypes": "passed",
     "isolatedBuild": "passed",
@@ -219,5 +219,5 @@
       "browser fixture stdin could not resolve JSX runtime; resolveDir bound to existing SDK ui-primitives"
     ]
   },
-  "previousDailyInstalledVersion": "0.1.10"
+  "previousDailyInstalledVersion": "1.0.0"
 }

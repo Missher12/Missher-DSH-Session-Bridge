@@ -14,12 +14,29 @@ export interface SessionListReader {
     getSnapshot(): {
       readonly byId: Readonly<Record<string, {
         readonly cwd?: string
+        readonly projectionValues?: { readonly workingDirectory?: string }
         readonly running?: boolean
       } | undefined>>
     }
   }
   /** Refresh the Host-backed summaries; optional on older Hosts. */
   refresh?(): void
+}
+
+/** The Host's read-only session projection RPC, when mounted. */
+export interface SessionProjectionReader {
+  projections?(request: { sessionId: string }, signal: AbortSignal): Promise<{
+    readonly ok: boolean
+    readonly value?: { readonly kind: string; readonly values: { readonly workingDirectory?: string } } | null
+  }>
+}
+
+async function currentDirectory(sessions: SessionListReader, sessionId: string, remote?: SessionProjectionReader) {
+  const row = sessions.list.getSnapshot().byId[sessionId]
+  if (typeof remote?.projections !== 'function') return row?.projectionValues?.workingDirectory || row?.cwd
+  const result = await remote.projections({ sessionId }, AbortSignal.timeout(10_000))
+  if (!result.ok || result.value?.kind !== 'sequenced') return undefined
+  return result.value.values.workingDirectory || row?.cwd
 }
 
 interface CopyNotice {
@@ -32,6 +49,7 @@ interface CopyNotice {
 export function createSessionCopyActions(
   sessions: SessionListReader,
   write: (value: string) => Promise<CopyOutcome> = writeClipboard,
+  getRemote?: () => SessionProjectionReader | undefined,
 ) {
   const listeners = new Set<() => void>()
   let notice: CopyNotice | null = null
@@ -52,13 +70,20 @@ export function createSessionCopyActions(
     dispose() { disposed = true; listeners.clear(); notice = null },
     async copy(kind: SessionCopyKind, sessionId: string): Promise<void> {
       if (disposed) return
-      const payload = copyPayload(kind, sessionId, sessions.list.getSnapshot().byId[sessionId]?.cwd)
+      const request = ++sequence
+      let cwd: string | undefined
+      if (kind === 'cwd') {
+        try { cwd = await currentDirectory(sessions, sessionId, getRemote?.()) }
+        catch { /* A failed current lookup must not copy a stale path. */ }
+        if (disposed || request !== sequence) return
+      }
+      const payload = copyPayload(kind, sessionId, cwd)
       if (payload === undefined) {
-        publish({ sequence: ++sequence, key: 'menu.cwdUnavailable', success: false })
+        publish({ sequence: request, key: 'menu.cwdUnavailable', success: false })
         return
       }
       const success = await write(payload.text).then(outcome => outcome === 'copied', () => false)
-      publish({ sequence: ++sequence, key: success ? 'chip.copied' : 'chip.failed', success })
+      if (request === sequence) publish({ sequence: request, key: success ? 'chip.copied' : 'chip.failed', success })
     },
   }
 }

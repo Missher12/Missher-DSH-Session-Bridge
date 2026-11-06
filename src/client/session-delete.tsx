@@ -148,7 +148,7 @@ export function SessionDeleteDialog({ deleteActions, t }: { deleteActions: Delet
         {tr(state.pending ? 'delete.pending' : 'delete.confirm')}
       </Button>
     </>}>
-    <code>{state.sessionId}</code>
-    {state.error !== undefined && <p role="alert">{tr(state.error)}</p>}
+    <code className="dsh-sb-deleteSessionId">{state.sessionId}</code>
+    {state.error !== undefined && <p className="dsh-sb-deleteError" role="alert">{tr(state.error)}</p>}
   </Modal>
 }

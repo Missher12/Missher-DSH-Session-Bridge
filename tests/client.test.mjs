@@ -6,7 +6,7 @@ import { it } from 'node:test'
 const source = readFileSync(new URL('../lib/client/index.js', import.meta.url), 'utf8')
 let client
 let request
-runInNewContext(source, { fetch: (...args) => request(...args), window: { __ModuleLoader__: { load({ factory }) {
+runInNewContext(source, { AbortSignal, fetch: (...args) => request(...args), window: { __ModuleLoader__: { load({ factory }) {
   client = factory(id => {
     if (['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'].includes(id)) return {}
     throw new Error(`Unapproved runtime import: ${id}`)
@@ -93,10 +93,11 @@ it('keeps identity actions in the sidebar without a header control or identity o
   assert.equal(registrations.filter(entry => entry.name === 'conversation.session.header.actions').length, 0)
   assert.equal(registrations.filter(entry => entry.id === 'session-bridge-identity-panel').length, 0)
   const copies = registrations.filter(entry => entry.name === 'sidebar.workspaces.session.menu.item'
-    && entry.id.startsWith('dsh-session-bridge.copy-'))
+    && (entry.id === 'session-id' || entry.id.startsWith('dsh-session-bridge.copy-')))
   assert.deepEqual(copies.map(entry => entry.id), [
-    'dsh-session-bridge.copy-id', 'dsh-session-bridge.copy-cwd', 'dsh-session-bridge.copy-bridge',
+    'session-id', 'dsh-session-bridge.copy-cwd', 'dsh-session-bridge.copy-bridge',
   ])
+  assert.ok(copies[0].priority > 0, 'the native entry at priority zero wins the shared slot')
   for (const entry of copies) {
     assert.equal(typeof entry.component, 'function')
     assert.equal(typeof entry.inject().copyReference, 'function')
@@ -107,6 +108,25 @@ it('keeps identity actions in the sidebar without a header control or identity o
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move').length, 0)
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move-dialog').length, 0)
   assert.equal(registrations.filter(entry => entry.id === 'dsh-session-bridge.move-toast').length, 1)
+})
+
+it('copies fresh moved paths, and does not write stale cache when projection lookup fails', async () => {
+  const copied = [], reads = []
+  let fail = false
+  const remote = { async projections({ sessionId }, signal) {
+    signal.throwIfAborted()
+    reads.push(sessionId)
+    return fail ? { ok: false } : { ok: true, value: { kind: 'sequenced', values: { workingDirectory: '/Crodis' } } }
+  } }
+  const actions = client.createSessionCopyActions({ list: { getSnapshot: () => ({ byId: { moved: { cwd: '/old' } } }) } },
+    async value => { copied.push(value); return 'copied' }, () => remote)
+  await actions.copy('id', 'moved')
+  await actions.copy('cwd', 'moved')
+  fail = true
+  await actions.copy('cwd', 'moved')
+  assert.deepEqual(copied, ['moved', '/Crodis'])
+  assert.deepEqual(reads, ['moved', 'moved'])
+  assert.equal(actions.getSnapshot().key, 'menu.cwdUnavailable')
 })
 
 it('reports a missing cwd or clipboard rejection without inventing a directory', async () => {
