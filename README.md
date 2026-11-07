@@ -4,7 +4,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**1.0.2**（侧栏拖放移动和删除会话，依赖宿主生命周期接口）。
+- 包名：`@missher/dsh-session-bridge`；版本：**1.0.3**（侧栏拖放移动和删除会话，依赖宿主生命周期接口）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -14,20 +14,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.2，下载 `missher-dsh-session-bridge-1.0.2.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.2，下载 `missher-dsh-session-bridge-1.0.3.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.2/missher-dsh-session-bridge-1.0.2.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.3/missher-dsh-session-bridge-1.0.3.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.2.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.3.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -169,7 +169,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.2.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.3.tgz
 ```
 
 SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。
