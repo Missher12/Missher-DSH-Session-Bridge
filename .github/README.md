@@ -2,6 +2,8 @@
 
 <h1>Session Bridge · 会话桥接</h1>
 
+<p><img src="../docs/images/overview.svg" alt="Session Bridge 功能示意" width="100%"></p>
+
 <p>找到会话、传递消息，并让临时工作区各归其位。</p>
 
 <p>
@@ -16,6 +18,10 @@
 
 ---
 
+<!-- current-source -->
+当前开发源码：**1.0.2** · [分支 `main`](https://github.com/Missher12/Missher-DSH-Session-Bridge/tree/main)。安装包以实际 Release 为准。
+<!-- /current-source -->
+
 ## 功能一览
 
 | 能做什么 | 说明 |
@@ -24,6 +30,14 @@
 | **跨会话协作** | 列出、读取或向明确指定的会话投递消息。 |
 | **临时工作区** | 复用“不在工作区”入口，或为一次性工作创建独立目录。 |
 | **移动与删除** | 在宿主提供相应生命周期接口时，使用拖放移动和确认删除。 |
+
+<!-- existing-screenshots -->
+## 界面示例
+
+<table><tr><td><a href="../docs/images/scratch-workspace-alpha2.png"><img src="../docs/images/scratch-workspace-alpha2.png" alt="新会话选择器末尾的“不在工作区（临时目录）”入口" width="100%"></a></td><td><a href="../docs/images/archive-confirm-rc2.png"><img src="../docs/images/archive-confirm-rc2.png" alt="归档会话的删除二次确认，说明工作区文件保留" width="100%"></a></td></tr></table>
+
+<sub>来自项目已有文档；截图版本与验证范围见<a href="../README.md">原始说明</a>，点击可放大。</sub>
+<!-- /existing-screenshots -->
 
 ## 快速开始
 
