@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Button, MenuItemButton, Modal, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconTrashOutlineRegular, MenuItemButton, Modal, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SESSION_DELETE_PATH } from '../session-delete-wire.js'
 import { en } from './locales.js'
 import type { SessionBridgeKey } from './locales.js'
@@ -127,7 +127,7 @@ export function SessionDeleteMenuItem({ sessionId, sessions, deleteActions, useM
       : status === 'error' ? 'delete.checkFailed' : 'delete.checking'
   const blocked = running || !supported
   return <>
-    <MenuItemButton danger separatorBefore disabled={blocked} onSelect={() => {
+    <MenuItemButton icon={<IconTrashOutlineRegular />} danger separatorBefore disabled={blocked} onSelect={() => {
       setMenuOpen(false)
       deleteActions.request(sessionId)
     }}>{tr('delete.action')}</MenuItemButton>

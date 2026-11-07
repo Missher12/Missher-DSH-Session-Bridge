@@ -1,6 +1,6 @@
 /** Sidebar copy actions and a notice that survives the row menu closing. */
 import { useSyncExternalStore } from 'react'
-import { MenuItemButton, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCopyOutlineRegular, IconFolderCloseRegular, IconLinkOutlineRegular, MenuItemButton, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { copyPayload, writeClipboard } from './clipboard.js'
 import type { CopyOutcome, CopyPayload } from './clipboard.js'
 import { en } from './locales.js'
@@ -91,6 +91,11 @@ export function createSessionCopyActions(
 type CopyActions = ReturnType<typeof createSessionCopyActions>
 type Translate = (key: SessionBridgeKey) => string
 
+/** Separate all copy actions, including the Host's preferred ID entry. */
+export function SessionCopyMenuSeparator() {
+  return <div className="dsh-sb-menuSeparator" role="separator" />
+}
+
 /** Each occurrence copies its own row identity, including archived rows. */
 export function SessionCopyMenuItem({ sessionId, kind, copyReference, useMenuOpenState, t }: {
   readonly sessionId: string
@@ -101,8 +106,9 @@ export function SessionCopyMenuItem({ sessionId, kind, copyReference, useMenuOpe
 }) {
   const [, setMenuOpen] = useMenuOpenState()
   const key = ({ id: 'chip.copy', cwd: 'menu.copyCwd', bridge: 'menu.copyBridge' } as const)[kind]
+  const Icon = { id: IconCopyOutlineRegular, cwd: IconFolderCloseRegular, bridge: IconLinkOutlineRegular }[kind]
   return (
-    <MenuItemButton separatorBefore={kind === 'id'} onSelect={() => {
+    <MenuItemButton icon={<Icon />} onSelect={() => {
       // Start within the click's clipboard activation before dismissing the menu.
       void copyReference(kind, sessionId)
       setMenuOpen(false)

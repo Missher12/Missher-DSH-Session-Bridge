@@ -30,7 +30,7 @@ try {
   await writeFile(entry, ['Menu:Menu', 'MenuItemButton:Menu', 'Modal:Modal', 'Button:Button', 'Toast:Toast'].map(item => {
     const [name, file] = item.split(':')
     return `export { ${name} } from ${JSON.stringify(join(primitiveDir, file + '.tsx'))};`
-  }).join('\n') + `\nexport { IconFolderCloseRegular, IconPlusOutlineRegular, IconSparkleRegular } from ${JSON.stringify(join(primitiveDir, 'icons/index.tsx'))};\n`)
+  }).join('\n') + `\nexport { IconCopyOutlineRegular, IconFolderCloseRegular, IconLinkOutlineRegular, IconPlusOutlineRegular, IconSparkleRegular, IconTrashOutlineRegular } from ${JSON.stringify(join(primitiveDir, 'icons/index.tsx'))};\n`)
   const output = await build({ entryPoints: [entry], outfile: join(temporary, 'primitives.cjs'), bundle: true, write: false, format: 'cjs', platform: 'browser', jsx: 'automatic',
     external: ['react', 'react-dom', 'react/jsx-runtime'], loader: { '.css': 'empty' }, logLevel: 'silent' })
   const primitiveModule = { exports: {} }
@@ -108,7 +108,7 @@ try {
     const cells = []
     for (const [id, { options, component }] of registrations) {
       if (options.name === 'shell.overlay' || (open && options.name === 'sidebar.workspaces.session.menu.item')) {
-        cells.push(React.createElement(component, { key: id, ...options.inject(), sessionId: 'archived', useMenuOpenState: () => [open, setOpen] }))
+        cells.push(React.createElement(component, { key: id, ...options.inject?.(), sessionId: 'archived', useMenuOpenState: () => [open, setOpen] }))
       }
     }
     return React.createElement(React.Fragment, null, ...cells)

@@ -5,7 +5,7 @@ import type { ScratchPickerInjected } from './ScratchWorkspacePicker.js'
 import { en, NS, zh } from './locales.js'
 import { SCRATCH_PATH, scratchWorkspace } from '../scratch-wire.js'
 import type { ScratchResult } from '../scratch-wire.js'
-import { createSessionCopyActions, SessionCopyMenuItem, SessionCopyNotice } from './session-menu.js'
+import { createSessionCopyActions, SessionCopyMenuItem, SessionCopyMenuSeparator, SessionCopyNotice } from './session-menu.js'
 import type { SessionCopyKind, SessionListReader, SessionProjectionReader } from './session-menu.js'
 
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
@@ -61,6 +61,7 @@ const STYLE_ID = 'dsh-session-bridge-styles'
  * `dsh-sbc-` to keep them out of the app's own namespace.
  */
 const STYLES = `
+.dsh-sb-menuSeparator { height: .5px; margin: 3px 2px; background: var(--dsw-alias-border-l2); }
 .dsh-sb-deleteHint {
   box-sizing: border-box; max-inline-size: min(280px, calc(100% - 16px)); margin: 4px 8px; padding: 8px 12px;
   border-radius: 6px; background: var(--dsw-alias-bg-layer-2);
@@ -300,6 +301,9 @@ export function apply(ctx: ClientContextLike): void {
     inject: () => picker,
   }, ScratchWorkspacePicker))
   const menu = 'sidebar.workspaces.session.menu.item'
+  ctx.slots.inject(menu, () => ctx.slots.register({
+    name: menu, id: 'dsh-session-bridge.information-separator', order: 440,
+  }, SessionCopyMenuSeparator))
   for (const [index, kind] of (['id', 'cwd', 'bridge'] as const).entries()) {
     ctx.slots.inject(menu, () => ctx.slots.register({
       name: menu, order: 500 + index * 10, locale: NS,
