@@ -14,7 +14,7 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.2，下载 `missher-dsh-session-bridge-1.0.3.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.3，下载 `missher-dsh-session-bridge-1.0.3.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
