@@ -37,7 +37,19 @@ export async function findScratchWorkspace(
   try {
     path = await canonicalScratchDirectory(join(resolve(root), 'dsh-scratch'))
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      // The OS may remove the temporary directory while its registration and
+      // sessions remain. Identify that exact saved path without recreating it.
+      let parent: string
+      try { parent = await realpath(resolve(root)) }
+      catch (parentError) {
+        if (parentError instanceof Error && 'code' in parentError && parentError.code === 'ENOENT') return null
+        throw parentError
+      }
+      signal.throwIfAborted()
+      const workspace = registry.list().find(item => item.path === join(parent, 'dsh-scratch'))
+      return workspace === undefined ? null : { workspaceId: workspace.id, path: workspace.path, title: workspace.title }
+    }
     throw error
   }
   signal.throwIfAborted()

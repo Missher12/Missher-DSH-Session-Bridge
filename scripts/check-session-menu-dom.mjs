@@ -244,14 +244,15 @@ try {
   const scratchLabel = 'Outside a workspace (temp folder)…'
   const rowLabels = () => [...document.querySelectorAll('[role=menuitem]')].map(node => node.textContent)
   async function picker(key, items, scratchId, selectedId, failure) {
+    let nextFailure = failure
     const props = {
       key, open: true, anchorRef: { current: anchor }, selectedId,
       onPick: id => picks.push(id), onClose() {},
       useWorkspaces: select => select({ phase: 'ready', items }),
       createWorkspace: async () => { throw new Error('normal adoption was not requested') },
       pickDirectory: async () => null,
-      findScratchWorkspace: async () => { pickerLookups++; if (failure) throw failure; return scratchId },
-      startScratchSession: async () => { creations++; return { workspaceId: 'new-scratch' } },
+      findScratchWorkspace: async () => { pickerLookups++; if (nextFailure) { const error = nextFailure; nextFailure = null; throw error }; return scratchId },
+      startScratchSession: async () => { creations++; return { workspaceId: scratchId ?? 'new-scratch' } },
     }
     await act(async () => root.render(React.createElement(plugin.ScratchWorkspacePicker, props)))
   }
@@ -266,18 +267,22 @@ try {
   assert.deepEqual(rowLabels(), ['Add workspace…', '我的临时目录'], 'renaming preserves the fixed last choice')
   await picker('same-title', [{ workspaceId: 'ordinary', title: '不在工作区' }], null)
   assert.deepEqual(rowLabels(), ['不在工作区', 'Add workspace…', scratchLabel], 'a same-named unrelated workspace must not hide scratch creation')
+  const beforeFirstUse = creations
   await picker('first-use', [], null)
   assert.deepEqual(rowLabels(), ['Add workspace…', scratchLabel])
-  assert.equal(creations, 0)
+  assert.equal(creations, beforeFirstUse)
   await act(async () => button(scratchLabel).click())
-  assert.equal(creations, 1)
+  assert.equal(creations, beforeFirstUse + 1)
   assert.equal(picks.at(-1), 'new-scratch')
   await picker('lookup-error', [{ workspaceId: 'ordinary', title: 'Real project' }], null, undefined, new Error('Scratch lookup unavailable'))
   assert.ok(document.querySelector('[role=dialog]').textContent.includes('Scratch lookup unavailable'))
   await act(async () => button('Cancel').click())
+  assert.deepEqual(rowLabels(), ['Reload workspaces', 'Add workspace…', scratchLabel])
+  assert.equal(button(scratchLabel).disabled, true)
+  await act(async () => button('Reload workspaces').click())
   await act(async () => button('Real project').click())
-  assert.equal(picks.at(-1), 'ordinary', 'a failed optional lookup leaves ordinary workspace selection usable')
-  assert.equal(pickerLookups, 5, 'rendering lookup results must not loop or create additional requests')
+  assert.equal(picks.at(-1), 'ordinary', 'retry restores ordinary workspace selection after a failed lookup')
+  assert.equal(pickerLookups, 6, 'only an explicit retry adds a lookup')
   anchor.remove()
   const fullSessionId = 'session-12345678-1234-5678-90ab-1234567890ab'
   await act(async () => root.render(React.createElement(plugin.SessionIdChip, {

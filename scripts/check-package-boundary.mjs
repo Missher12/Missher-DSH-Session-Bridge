@@ -11,7 +11,7 @@ const archive = resolve(process.argv[2])
 const root = fileURLToPath(new URL('../', import.meta.url))
 const output = resolve(process.argv[3] ?? `${root}/verification/package-boundary.json`)
 const entries = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n')
-const read = name => execFileSync('tar', ['-xOzf', archive, `package/${name}`], { encoding: 'utf8' })
+const read = name => execFileSync('tar', ['-xOzf', archive, `package/${name}`], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
 assert.ok(entries.every(name => name.startsWith('package/') && !name.split('/').includes('..')))
 assert.ok(entries.every(name => !/dsh-context-manager|(^|\/)node_modules\/|(^|\/)verification\/|\.tgz$|\.patch$/.test(name)))
 const manifest = JSON.parse(read('package.json'))
@@ -29,8 +29,8 @@ for (const target of [manifest.main, ...Object.values(manifest.exports).map(valu
   assert.ok(!target.split('/').includes('..') && !target.startsWith('/'))
   assert.ok(entries.includes(`package/${target.replace(/^\.\//, '')}`), `missing entry point: ${target}`)
 }
-for (const entry of entries.filter(name => !name.endsWith('/'))) {
-  assert.doesNotMatch(read(entry.slice('package/'.length)), /\/Users\/[^\s/]+|\/home\/[^\s/]+|[A-Z]:\\Users\\/,
+for (const entry of entries.filter(name => !name.endsWith('/') && !/\.(?:png|jpe?g|gif|webp|ico|pdf)$/i.test(name))) {
+  assert.equal(/\/Users\/[^\s/]+|\/home\/[^\s/]+|[A-Z]:\\Users\\/.test(read(entry.slice('package/'.length))), false,
     `machine-specific path: ${entry}`)
 }
 assert.ok(entries.every(name => !/\/harness-sdk(?:\/|$)|\/(?:REPAIR_REPORT|PLUGIN_BOUNDARIES|SESSION_ACTIONS)\.md$/.test(name)))

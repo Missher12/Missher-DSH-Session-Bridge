@@ -9,6 +9,21 @@ import { scratchTitle, scratchWorkspace } from '../lib/scratch-wire.js'
 
 const signal = () => new AbortController().signal
 
+it('still identifies a registered fixed workspace after its temporary directory was removed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bridge-rpc-missing-'))
+  try {
+    const directory = join(root, 'dsh-scratch')
+    await mkdir(directory)
+    const path = await realpath(directory)
+    const saved = { id: 'saved-scratch', path, title: 'Renamed scratch' }
+    const registry = { list: () => [saved], async resolveByPath() { throw new Error('the removed directory cannot be resolved') },
+      async create(restoredPath) { assert.equal(restoredPath, path); return saved } }
+    await rm(directory, { recursive: true })
+    assert.deepEqual(await findScratchWorkspace(registry, root, signal()), { workspaceId: saved.id, path, title: saved.title })
+    assert.deepEqual(await ensureScratchWorkspace(registry, root, 'Outside', signal()), { workspaceId: saved.id, path, title: saved.title })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 it('optional service lookup never reads an uninjected property or hides a lookup failure', () => {
   const ctx = new Proxy({ get: () => undefined }, { get(target, key) {
     if (key === 'get') return target.get
@@ -26,7 +41,7 @@ it('creates one canonical titled workspace with no Session creation, including s
     await mkdir(owned)
     await symlink(owned, alias)
     const records = new Map()
-    const registry = { async resolveByPath(path) { return records.get(path) }, async create(path, title) {
+    const registry = { list: () => [...records.values()], async resolveByPath(path) { return records.get(path) }, async create(path, title) {
       assert.equal(path, await realpath(join(owned, 'dsh-scratch')))
       if (!records.has(path)) records.set(path, { id: 'workspace-shared', path, title })
       return records.get(path)
@@ -80,7 +95,7 @@ it('registers a scoped Fetch route behind Connection authentication and retries 
       route = value
       return async () => { disposed = true }
     } } },
-    workspaceRegistry: { async resolveByPath(path) {
+    workspaceRegistry: { list: () => [], async resolveByPath(path) {
       return attempts < 2 ? undefined : { id: 'workspace-shared', path, title: 'Renamed scratch' }
     }, async create(path, title) {
       if (++attempts === 1) throw new Error('disk failure')

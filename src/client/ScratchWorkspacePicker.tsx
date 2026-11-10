@@ -47,6 +47,7 @@ const ADD_WORKSPACE = '::add-workspace'
 
 /** Menu row id of this plugin's "not in a workspace" action. */
 const SCRATCH = '::scratch-session'
+const RETRY = '::scratch-retry'
 
 /** One Workspace as the picker lists it. */
 interface WorkspaceRow {
@@ -135,6 +136,8 @@ export function ScratchWorkspacePicker({
   const [error, setError] = useState<string | null>(null)
   const [scratchWorkspaceId, setScratchWorkspaceId] = useState<string | null>(null)
   const [lookingUpScratch, setLookingUpScratch] = useState(true)
+  const [lookupFailed, setLookupFailed] = useState(false)
+  const [lookupRevision, setLookupRevision] = useState(0)
   const workspaceIds = workspaces.map(workspace => workspace.workspaceId).join('\0')
 
   // The normal list already contains a registered scratch workspace. Resolve
@@ -144,18 +147,20 @@ export function ScratchWorkspacePicker({
     if (!open) return
     const controller = new AbortController()
     setLookingUpScratch(true)
+    setLookupFailed(false)
     void findScratchWorkspace(controller.signal).then((id) => {
       if (!controller.signal.aborted) setScratchWorkspaceId(id)
     }).catch((reason: unknown) => {
       if (!controller.signal.aborted) {
-        setScratchWorkspaceId(null)
+        setScratchWorkspaceId(previous => workspaces.some(workspace => workspace.workspaceId === previous) ? previous : null)
+        setLookupFailed(true)
         setError(messageOf(reason))
       }
     }).finally(() => {
       if (!controller.signal.aborted) setLookingUpScratch(false)
     })
     return () => { controller.abort() }
-  }, [open, workspaceIds, findScratchWorkspace])
+  }, [open, workspaceIds, findScratchWorkspace, lookupRevision])
 
   const getAnchorRect = useCallback(
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
@@ -191,6 +196,7 @@ export function ScratchWorkspacePicker({
     void (async () => {
       try {
         const { workspaceId } = await startScratchSession(text(t, 'picker.scratchTitle'))
+        setScratchWorkspaceId(workspaceId)
         onPick(workspaceId)
       } catch (reason: unknown) {
         setError(messageOf(reason))
@@ -201,11 +207,16 @@ export function ScratchWorkspacePicker({
   }
 
   const handleSelect = (id: string): void => {
+    if (id === RETRY) {
+      setError(null)
+      setLookupRevision(previous => previous + 1)
+      return
+    }
     if (id === ADD_WORKSPACE) {
       chooseDirectory()
       return
     }
-    if (id === SCRATCH) {
+    if (id === SCRATCH || id === scratchWorkspaceId) {
       startScratch()
       return
     }
@@ -213,7 +224,10 @@ export function ScratchWorkspacePicker({
   }
 
   const scratch = workspaces.find(workspace => workspace.workspaceId === scratchWorkspaceId)
-  const workspaceItems: MenuEntry[] = workspaces.filter(workspace => workspace.workspaceId !== scratchWorkspaceId).map(workspace => ({
+  // Until the first identity is known, showing the ordinary list would flash
+  // scratch at its saved position and then move it below Add workspace.
+  const canListWorkspaces = (!lookingUpScratch && !lookupFailed) || scratch !== undefined
+  const workspaceItems: MenuEntry[] = (canListWorkspaces ? workspaces : []).filter(workspace => workspace.workspaceId !== scratchWorkspaceId).map(workspace => ({
     id: workspace.workspaceId,
     label: workspace.title,
     icon: <IconFolderCloseRegular size={16} />,
@@ -230,13 +244,16 @@ export function ScratchWorkspacePicker({
       disabled: busy,
     },
   ]
-  const scratchEntries: MenuEntry[] = !lookingUpScratch ? [{
+  const retryEntries: MenuEntry[] = lookupFailed ? [{
+    id: RETRY, label: text(t, 'picker.retry'), disabled: busy || lookingUpScratch,
+  }] : []
+  const scratchEntries: MenuEntry[] = [{
       id: scratch?.workspaceId ?? SCRATCH,
       label: scratch?.title ?? (busy ? text(t, 'picker.starting') : text(t, 'picker.scratch')),
       icon: <IconSparkleRegular size={16} />,
-      disabled: busy,
-    }] : []
-  const items: MenuEntry[] = [...workspaceItems, ...addEntries, ...scratchEntries]
+      disabled: busy || (scratch === undefined && (lookingUpScratch || lookupFailed)),
+    }]
+  const items: MenuEntry[] = [...workspaceItems, ...retryEntries, ...addEntries, ...scratchEntries]
 
   const closeModal = (): void => { setError(null) }
 

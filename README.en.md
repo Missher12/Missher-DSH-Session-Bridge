@@ -6,7 +6,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **1.0.2** (confirmed delete and sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
+- Package: `@missher/dsh-session-bridge`; version: **1.0.4** (confirmed delete and sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -16,20 +16,20 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 ## Install and update
 
-Select 1.0.2 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-1.0.3.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
+Select 1.0.4 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-1.0.4.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.3/missher-dsh-session-bridge-1.0.3.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.4/missher-dsh-session-bridge-1.0.4.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.3.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.4.tgz
 ```
 
 Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do not enable the old `dsh-session-bridge`, the `session-bridge-dev` alias and the scoped package together: they register the same tools, including `session_list`. Keep the previous package/configuration and let active work finish before reloading an upgrade.
@@ -44,11 +44,11 @@ Actions use the selected row, including archived rows, without switching the cur
 
 ### “Not in a workspace” and scratch
 
-The new-session workspace picker ends with a scratch entry. Selecting it reuses a registered **`dsh-scratch` workspace**, with the default title “Not in a workspace.” On macOS the default canonical path is `/private/tmp/dsh-scratch`. It is still a **genuinely registered workspace** that simply carries that name — not a session without one, because the Host's blank-session input flow requires a workspace.
+The new-session workspace picker keeps its scratch entry directly below “Add workspace…”, including during lookup and retry. An existing scratch workspace appears only in that fixed position. Selecting it reuses a registered **`dsh-scratch` workspace**, with the default title “Not in a workspace.” On macOS the default canonical path is `/private/tmp/dsh-scratch`. It is still a **genuinely registered workspace** that simply carries that name — not a session without one, because the Host's blank-session input flow requires a workspace.
 
 ![The scratch entry at the end of the new-session workspace picker](docs/images/scratch-workspace-alpha2.png)
 
-Opening the picker alone creates no directory or session. Repeated selection reuses the canonical path and workspace ID, preserves user renaming and does not merge unrelated workspaces with matching titles. A symlink, a directory owned by another user, or one writable by the group/others is rejected for the fixed scratch location.
+Opening the picker alone creates no directory or session. Repeated selection reuses the canonical path and workspace ID, preserves user renaming and does not merge unrelated workspaces with matching titles. If the OS removed the temporary directory, selecting it recreates the directory and reuses the saved registration; this does not recover files already removed by the OS. A symlink, a directory owned by another user, or one writable by the group/others is rejected for the fixed scratch location.
 
 The `session_scratch` tool and `/scratch` command instead create a separate temporary directory for every call. This differs from the UI's reusable `dsh-scratch` workspace. Operating-system cleanup may remove temporary files; do not keep the only copy of important work there.
 
@@ -168,7 +168,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.3.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.4.tgz
 ```
 
 The SDK link is for development only and is neither committed nor packaged. The tarball contains compiled runtime files, corresponding source, licenses and user documentation; development scripts and historical local receipts remain in Git. The Node entry uses structural `ctx` services without runtime imports from `@deepseek-ai/dsh-*`. The client keeps three existing Host static requests: `react`, `react/jsx-runtime` and `@deepseek-ai/dsh-client-ui-primitives`. No runtime dependencies were added.
