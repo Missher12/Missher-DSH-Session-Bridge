@@ -1,5 +1,7 @@
 # Session Bridge
 
+![Session Bridge · 会话桥接（品牌插画）](docs/images/cover-v2.png)
+
 [中文](README.md) | English · [Desktop and downloads](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [All plugins](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.md)
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.

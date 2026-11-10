@@ -1,5 +1,7 @@
 # Session Bridge · 会话桥接
 
+![Session Bridge · 会话桥接（品牌插画）](docs/images/cover-v2.png)
+
 中文 | [English](README.en.md) · [桌面端与安装包](https://github.com/Missher12/Missher-DeepseekHarness-Desktop) · [全部插件](https://github.com/Missher12/Missher-DeepseekHarness-Desktop/blob/main/plugins/README.zh.md)
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。

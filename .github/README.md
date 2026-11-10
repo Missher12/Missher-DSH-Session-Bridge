@@ -2,7 +2,7 @@
 
 <h1>Session Bridge · 会话桥接</h1>
 
-<p><img src="../docs/images/overview.svg" alt="Session Bridge 功能示意" width="100%"></p>
+<p><img src="../docs/images/cover-v2.png" alt="Session Bridge · 会话桥接（品牌插画）" width="100%"></p>
 
 <p>找到会话、传递消息，并让临时工作区各归其位。</p>
 
