@@ -7,7 +7,7 @@
 <p>找到会话、传递消息，并让临时工作区各归其位。</p>
 
 <p>
-  <a href="https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v1.0.3"><img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-1.0.3-4D6BFE?style=flat-square" alt="版本: 1.0.3"></a>
+  <a href="https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v1.0.4"><img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-1.0.4-4D6BFE?style=flat-square" alt="版本: 1.0.4"></a>
   <a href="https://github.com/Missher12/Missher-DSH-Session-Bridge"><img src="https://img.shields.io/badge/%E6%96%87%E6%A1%A3-%E4%B8%AD%E6%96%87-4D6BFE?style=flat-square" alt="文档: 中文"></a>
   <a href="https://github.com/Missher12/Missher-DSH-Session-Bridge/blob/main/LICENSE"><img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-MIT-6B7280?style=flat-square" alt="许可: MIT"></a>
 </p>
@@ -19,7 +19,7 @@
 ---
 
 <!-- current-source -->
-当前开发源码：**1.0.3** · [分支 `main`](https://github.com/Missher12/Missher-DSH-Session-Bridge/tree/main)。安装包以实际 Release 为准。
+当前开发源码：**1.0.4** · [分支 `main`](https://github.com/Missher12/Missher-DSH-Session-Bridge/tree/main)。安装包以实际 Release 为准。
 <!-- /current-source -->
 
 ## 功能一览
@@ -33,7 +33,7 @@
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v1.0.3) 下载对应版本的 `.tgz` 安装包。
+1. 从 [Releases](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/tag/v1.0.4) 下载对应版本的 `.tgz` 安装包。
 2. 在 DSH **插件 → 添加插件** 中选择下载的文件，安装并启用；按宿主提示重新加载或正常重启。
 3. 在侧栏会话的三点菜单中复制 ID；在聊天中使用 `/sessions` 或 `/bridge`。
 
