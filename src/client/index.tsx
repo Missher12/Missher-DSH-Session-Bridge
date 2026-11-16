@@ -7,6 +7,9 @@ import { SCRATCH_PATH, scratchWorkspace } from '../scratch-wire.js'
 import type { ScratchResult } from '../scratch-wire.js'
 import { createSessionCopyActions, SessionCopyMenuItem, SessionCopyMenuSeparator, SessionCopyNotice } from './session-menu.js'
 import type { SessionCopyKind, SessionListReader, SessionProjectionReader } from './session-menu.js'
+import { registerSessionContextMenu } from './session-context-menu.js'
+import type { SessionContextMenus } from './session-context-menu.js'
+import type { SessionBridgeKey } from './locales.js'
 
 import { createSessionDeleteActions, SessionDeleteMenuItem, SessionDeleteDialog } from './session-delete.js'
 import { createSessionMoveActions, SessionMoveToast } from './session-move.js'
@@ -198,12 +201,17 @@ const STYLES = `
 
 /** The client services used by this plugin in DSH 0.1.7-rc.2. */
 export interface ClientContextLike {
-  readonly locale: { register(namespace: string, dictionaries: Record<string, unknown>): unknown }
+  readonly locale: {
+    register(namespace: string, dictionaries: Record<string, unknown>): unknown
+    bind?(namespace: string): (key: SessionBridgeKey) => string
+    subscribe?(listener: () => void): () => void
+  }
   readonly slots: {
     inject(slot: string, register: () => unknown): unknown
     register<Injected extends object>(options: {
       readonly name: string
       readonly id?: string
+      readonly key?: string
       readonly order?: number
       readonly priority?: number
       readonly locale?: string
@@ -220,7 +228,10 @@ export interface ClientContextLike {
     create(input: { readonly path: string }): Promise<{ readonly workspaceId: string }>
   }
   readonly sessions: SessionListReader
-  get?(name: 'remote.session'): SessionProjectionReader | undefined
+  get?: {
+    (name: 'remote.session'): SessionProjectionReader | undefined
+    (name: 'contextMenus'): SessionContextMenus | undefined
+  }
   effect(disposer: () => unknown, label?: string): void
 }
 
@@ -300,22 +311,24 @@ export function apply(ctx: ClientContextLike): void {
     locale: NS,
     inject: () => picker,
   }, ScratchWorkspacePicker))
-  const menu = 'sidebar.workspaces.session.menu.item'
-  ctx.slots.inject(menu, () => ctx.slots.register({
-    name: menu, id: 'dsh-session-bridge.information-separator', order: 440,
-  }, SessionCopyMenuSeparator))
-  for (const [index, kind] of (['id', 'cwd', 'bridge'] as const).entries()) {
+  if (!registerSessionContextMenu(ctx, copyActions, deleteActions)) {
+    const menu = 'sidebar.workspaces.session.menu.item'
     ctx.slots.inject(menu, () => ctx.slots.register({
-      name: menu, order: 500 + index * 10, locale: NS,
-      // Share the native cell. Its default priority (0) wins while mounted.
-      ...(kind === 'id' ? { id: 'session-id', priority: 1 } : { id: `dsh-session-bridge.copy-${kind}` }),
-      inject: (): { kind: SessionCopyKind; copyReference: typeof copyActions.copy } => ({ kind, copyReference: copyActions.copy }),
-    }, SessionCopyMenuItem))
+      name: menu, id: 'dsh-session-bridge.information-separator', order: 440,
+    }, SessionCopyMenuSeparator))
+    for (const [index, kind] of (['id', 'cwd', 'bridge'] as const).entries()) {
+      ctx.slots.inject(menu, () => ctx.slots.register({
+        name: menu, order: 500 + index * 10, locale: NS,
+        // Share the native cell. Its default priority (0) wins while mounted.
+        ...(kind === 'id' ? { id: 'session-id', priority: 1 } : { id: `dsh-session-bridge.copy-${kind}` }),
+        inject: (): { kind: SessionCopyKind; copyReference: typeof copyActions.copy } => ({ kind, copyReference: copyActions.copy }),
+      }, SessionCopyMenuItem))
+    }
+    ctx.slots.inject(menu, () => ctx.slots.register({
+      name: menu, id: 'dsh-session-bridge.delete', order: 600, locale: NS,
+      inject: () => ({ sessions: ctx.sessions, deleteActions }),
+    }, SessionDeleteMenuItem))
   }
-  ctx.slots.inject(menu, () => ctx.slots.register({
-    name: menu, id: 'dsh-session-bridge.delete', order: 600, locale: NS,
-    inject: () => ({ sessions: ctx.sessions, deleteActions }),
-  }, SessionDeleteMenuItem))
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'dsh-session-bridge.delete-dialog', locale: NS,
     inject: () => ({ deleteActions }),

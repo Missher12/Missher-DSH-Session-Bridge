@@ -1,21 +1,22 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.4",
-  "candidateStatus": "1.0.4: fixed scratch picker placement and recovery of the existing registration after temporary-directory cleanup.",
+  "packageVersion": "1.0.5",
+  "candidateStatus": "1.0.5: unified native context-menu groups and icons, with legacy Host fallback.",
   "hardHostVersionGate": false,
-  "change": "Keep scratch directly after Add workspace throughout lookup and retry; retain its exact identity after temporary-directory cleanup and ensure the directory before navigation.",
+  "change": "Join the native information group without duplicating the Host ID action; put deletion after archive in its own group and retain asynchronous capability, running-state and confirmation safeguards.",
   "currentChecks": {
     "check": "pnpm run check passed: strict Host/client types, both builds, client Loader check and offline tests.",
     "offlineTests": {
       "passed": 71,
       "failed": 0,
-      "skipped": 12,
+      "skipped": 15,
       "cancelled": 0,
       "concurrency": 1
     },
-    "regressions": "Four focused cases failed before the fix: loading placement, lookup retry, known-identity retention, and a removed temporary directory. All now pass.",
-    "skips": "12 pre-existing chip tests require a full Host SDK checkout with React/JSDOM.",
-    "nativeAcceptance": "See v1.0.4 release notes for daily installation and native menu acceptance."
+    "regressions": "Three native-menu regressions failed before the fix and now pass: duplicate legacy contributions, missing native deletion, and unavailable deletion presentation.",
+    "skips": "12 pre-existing chip tests and 3 scratch picker tests need optional full React/JSDOM SDK setup; the separate menu DOM check uses real Host React and primitives.",
+    "host": "DSH 0.2.2-rc.3 native registry, workspace contributions, renderer and primitives; controlled session stores and transport.",
+    "nativeAcceptance": "Native Electron inspection was unavailable because the computer-use app connection timed out; no native-click or pixel-layout claim."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",

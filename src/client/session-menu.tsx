@@ -11,6 +11,7 @@ export type SessionCopyKind = CopyPayload['key']
 /** The global summary list reads metadata without activating a Session. */
 export interface SessionListReader {
   readonly list: {
+    subscribe?(listener: () => void): () => void
     getSnapshot(): {
       readonly byId: Readonly<Record<string, {
         readonly cwd?: string

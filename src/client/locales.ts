@@ -13,6 +13,10 @@ export const NS = 'sessionBridge'
 /** Simplified Chinese dictionary — the key set is the source of truth. */
 export const zh = {
   'delete.action': '删除会话…',
+  'delete.checkingAction': '删除会话（检查中…）',
+  'delete.runningAction': '删除会话（运行中）',
+  'delete.unavailableAction': '删除会话（宿主暂不支持）',
+  'delete.failedAction': '删除会话（检查失败，请重开菜单）',
   'delete.title': '删除聊天记录？',
   'delete.description': '此操作将永久删除该会话的聊天记录，无法撤销。工作区里的实际文件会保留。',
   'delete.confirm': '确认删除',
@@ -71,6 +75,10 @@ export type SessionBridgeKey = keyof typeof zh
 /** English dictionary, key-identical to the Chinese source of truth. */
 export const en: Record<SessionBridgeKey, string> = {
   'delete.action': 'Delete session…',
+  'delete.checkingAction': 'Delete session (checking…)',
+  'delete.runningAction': 'Delete session (running)',
+  'delete.unavailableAction': 'Delete session (unsupported by Host)',
+  'delete.failedAction': 'Delete session (check failed; reopen menu)',
   'delete.title': 'Delete chat history?',
   'delete.description': 'This permanently deletes this session’s chat history and cannot be undone. Files in the workspace are kept.',
   'delete.confirm': 'Delete permanently',

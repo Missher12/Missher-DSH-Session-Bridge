@@ -16,7 +16,7 @@ const { createRoot } = requireUi('react-dom/client')
 const { act } = React
 const temporary = await mkdtemp(join(tmpdir(), 'bridge-menu-dom-'))
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true })
-const keys = ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame', 'MutationObserver']
+const keys = ['window', 'document', 'navigator', 'HTMLElement', 'HTMLButtonElement', 'Element', 'Node', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame', 'MutationObserver']
 const originals = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
 for (const key of keys) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key], writable: true })
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -30,7 +30,7 @@ try {
   await writeFile(entry, ['Menu:Menu', 'MenuItemButton:Menu', 'Modal:Modal', 'Button:Button', 'Toast:Toast'].map(item => {
     const [name, file] = item.split(':')
     return `export { ${name} } from ${JSON.stringify(join(primitiveDir, file + '.tsx'))};`
-  }).join('\n') + `\nexport { IconCopyOutlineRegular, IconFolderCloseRegular, IconLinkOutlineRegular, IconPlusOutlineRegular, IconSparkleRegular, IconTrashOutlineRegular } from ${JSON.stringify(join(primitiveDir, 'icons/index.tsx'))};\n`)
+  }).join('\n') + `\nexport { IconCopyOutlineRegular, IconFolderCloseRegular, IconLinkOutlineRegular, IconPlusOutlineRegular, IconSparkleRegular, IconTrashOutlineRegular, IconPinOutlineRegular, IconEditOutlineRegular, IconBranchOutlineRegular, IconArchiveOutlineRegular } from ${JSON.stringify(join(primitiveDir, 'icons/index.tsx'))};\n`)
   const output = await build({ entryPoints: [entry], outfile: join(temporary, 'primitives.cjs'), bundle: true, write: false, format: 'cjs', platform: 'browser', jsx: 'automatic',
     external: ['react', 'react-dom', 'react/jsx-runtime'], loader: { '.css': 'empty' }, logLevel: 'silent' })
   const primitiveModule = { exports: {} }
@@ -292,7 +292,75 @@ try {
   assert.equal(document.querySelector('.dsh-sbc-chipId').textContent, fullSessionId, 'visible ID includes every character and the prefix')
   await act(async () => document.querySelector('.dsh-sbc-chip').click())
   assert.equal(copied.at(-1), fullSessionId, 'copy matches the full visible identity')
+  // Exercise the current Host's real registry and renderer as well as its legacy seam.
+  const nativeEntry = join(temporary, 'native-menu.mjs')
+  await writeFile(nativeEntry, [
+    ['MenuRegistry', 'packages/client/ui-context-menu/src/client/registry.ts'],
+    ['menuEntries', 'packages/client/ui-context-menu/src/client/View.tsx'],
+    ['registerSessionMenus', 'packages/client/ui-workspace/src/client/session-actions/context-menus.tsx'],
+  ].map(([name, file]) => `export { ${name} } from ${JSON.stringify(join(checkout, file))};`).join('\n'))
+  const nativeBuild = await build({ entryPoints: [nativeEntry], bundle: true, write: false, format: 'cjs', platform: 'browser', jsx: 'automatic',
+    external: ['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'], logLevel: 'silent' })
+  const nativeModule = { exports: {} }
+  vm.runInThisContext(`(function(require,module,exports){${nativeBuild.outputFiles[0].text}\n})`)(
+    id => id === '@deepseek-ai/dsh-client-ui-primitives' ? primitives : requireUi(id), nativeModule, nativeModule.exports)
+  const { MenuRegistry, menuEntries, registerSessionMenus } = nativeModule.exports
+  const registry = new MenuRegistry(message => assert.fail(message ?? 'native menu failed'), 1000)
+  cleanup.push(() => registry.dispose())
+  const nativeSlots = [], icons = new Map(Object.entries({
+    'workspace.pin': primitives.IconPinOutlineRegular, 'workspace.rename': primitives.IconEditOutlineRegular,
+    'workspace.fork': primitives.IconBranchOutlineRegular, 'workspace.copy': primitives.IconCopyOutlineRegular,
+    'workspace.archive': primitives.IconArchiveOutlineRegular,
+  }))
+  const observable = value => ({ getSnapshot: () => value, subscribe: () => () => {} })
+  let dictionaries
+  const nativeContext = {
+    effect(start) { const dispose = start(); if (typeof dispose === 'function') cleanup.push(dispose) },
+    locale: { ...observable('en'), register(_namespace, value) { dictionaries = value; return () => {} },
+      bind: namespace => key => namespace === 'sessionBridge' ? dictionaries.en[key] : key },
+    contextMenus: registry, get: name => name === 'contextMenus' ? registry : undefined,
+    uiWorkspace: {}, sessions: { list: observable({ byId: sessionsRow }) },
+    workspaces: { list: observable({ ...workspacesList.getSnapshot(), pinnedSessionIds: [], archivedSessionIds: [] }) },
+    remoteAccess: { source: () => observable(true) },
+    slots: { inject(_slot, register) { register() }, register(options, component) {
+      nativeSlots.push({ options, component }); if (options.name === 'contextMenu.icon') icons.set(options.key, component)
+      return () => {}
+    } },
+  }
+  registerSessionMenus(nativeContext, { copySessionId: id => copied.push(id) })
+  plugin.apply(nativeContext)
+  assert(!nativeSlots.some(row => row.options.name === 'sidebar.workspaces.session.menu.item'), 'native mode adds no duplicate legacy entries')
+  probe = async () => Response.json({ supported: true })
+  const occurrence = registry.resolve({ kind: 'session', value: { sessionId: 'archived', displayTitle: 'Synthetic' } })
+  cleanup.push(() => occurrence.dispose())
+  const icon = (_slot, _props, { entryKey }) => {
+    assert(icons.has(entryKey), `unregistered icon ${entryKey}`)
+    return React.createElement(icons.get(entryKey))
+  }
+  function NativeView() {
+    const [open, setOpen] = React.useState(true)
+    const actions = React.useSyncExternalStore(occurrence.source.subscribe, occurrence.source.getSnapshot)
+    return React.createElement(React.Fragment, null,
+      React.createElement(primitives.Menu, { open, anchor: null, onClose: () => setOpen(false),
+        items: menuEntries(actions.filter(action => !action.afterContent), [], icon),
+        footer: menuEntries(actions.filter(action => action.afterContent), [], icon),
+        onSelect: id => { occurrence.select(id); setOpen(false) } }),
+      ...nativeSlots.filter(row => row.options.name === 'shell.overlay').map(({ options, component }) =>
+        React.createElement(component, { key: options.id, ...options.inject?.() })))
+  }
+  await act(async () => { await occurrence.ready; root.render(React.createElement(NativeView)) })
+  const nativeRows = [...document.querySelectorAll('[role=menuitem]')]
+  assert.deepEqual(nativeRows.map(row => row.textContent), ['menu.pinSession', 'rename', 'menu.fork', 'menu.sessionId',
+    'Copy working directory', 'Copy /bridge reference', 'menu.archiveSession', 'Delete session…'])
+  assert(nativeRows.every(row => row.querySelector('svg')), 'all native and plugin actions render an icon')
+  assert.equal(document.querySelectorAll('[role=separator]').length, 3, 'common, information, archive and deletion are separated')
+  const beforeNativeDelete = sends
+  await act(async () => button('Delete session…').click())
+  assert(document.querySelector('[role=dialog]'), 'native selection opens the existing confirmation')
+  assert.equal(sends, beforeNativeDelete, 'native selection does not delete without confirmation')
+  await act(async () => button('Cancel').click())
   const result = { status: 'passed', realReactAndPrimitives: true, builtPlugin: true, copiedSelectedRow: true,
+    nativeRegistryAndRenderer: true, nativeGroupsAndIcons: true, nativeIdNotDuplicated: true,
     fullSessionIdVisible: true, fullSessionIdCopied: true, archiveReceiverPreserved: true,
     confirmationBeforeSend: true, cancelDoesNotDelete: true, pendingBlocksRepeat: true, feedbackAfterMenuClose: true,
     unsupportedVisibleAndDisabled: true, failedProbeDistinct: true, staleProbeIgnored: true,
