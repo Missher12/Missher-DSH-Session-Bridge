@@ -1,4 +1,4 @@
-/** Plugin-owned, authenticated deletion route; the Host owns storage and lifecycle. */
+/** Authenticated deletion route; requests contain an ID and confirmation, never a path. */
 export const SESSION_DELETE_PATH = '/api/session-bridge/delete-session'
 
 /** Reject paths, extra fields, and requests that did not explicitly confirm deletion. */

@@ -6,7 +6,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **1.0.5** (confirmed delete and sidebar drag-and-drop move; requires a Host with the lifecycle methods described below).
+- Package: `@missher/dsh-session-bridge`; version: **1.0.6** (menu groups, sidebar drag-and-drop move and bundled safe deletion on the reviewed Host).
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -14,22 +14,31 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 1.0.1 fixes misdelivery when a longer session title is ambiguous. An exact ID selects its session and message bodies keep their line breaks, indentation and trailing whitespace. The sidebar looks up the clicked session’s current directory and gives the native copy-ID action precedence.
 
+
+## Bundled deletion in 1.0.6
+
+On the reviewed DSH 0.2.2-rc.3 JSONL composition, installing this package alone now provides permanent deletion. A native Host transaction still takes precedence. The companion reuses native writer leases, serializes child creation against parent deletion, refuses running/queued/foreign-owned Sessions and parents with derived Sessions, and releases idle API-owned Agents normally.
+
+A durable intent precedes removal of plain/compressed logs and retained generations. Workspace, archive, pin, projection-cache and SQLite cleanup runs through the respective owners. Interrupted cleanup is replayed on plugin startup and never reported as success. Minimal deletion markers and the stable lock file remain; workspace files are preserved. Keep the plugin installed while cleanup is pending. Other programs writing the same store must follow the same transaction contract.
+
+Private seams are checked against reviewed implementations. An unknown Host/backend or another extension replacing a seam disables this fallback; other Bridge features retain their existing capability checks. Drag-and-drop movement still needs the Host move transaction. Verified with original DSH 0.2.2-rc.3 runtime files and a fresh isolated profile on macOS Intel; Windows, Linux and native window clicks remain untested. Earlier missing-capability notes describe older releases, not this fallback.
+
 ## Install and update
 
-Select 1.0.5 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-1.0.5.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
+Select 1.0.6 on the [Releases page](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) and download `missher-dsh-session-bridge-1.0.6.tgz` and `SHA256SUMS`. That page determines which versions and assets are available. The package includes compiled files; GitHub’s automatic source archive is not the plugin installer.
 
 In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. The package includes compiled `lib` files and has no install scripts; users do not need a build environment.
 
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.5/missher-dsh-session-bridge-1.0.5.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.6/missher-dsh-session-bridge-1.0.6.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.6.tgz
 ```
 
 Use separate `DSH_HOME` / `DSH_AGENTS_HOME` directories for initial testing. Do not enable the old `dsh-session-bridge`, the `session-bridge-dev` alias and the scoped package together: they register the same tools, including `session_list`. Keep the previous package/configuration and let active work finish before reloading an upgrade.
@@ -87,7 +96,7 @@ After removing the header ID in 0.1.4, Host/client typechecks, the isolated buil
 
 No alpha.5 browser or native Electron UI was tested in this increment; the earlier community-Host screenshots are not official-Host UI evidence. See the [official alpha.5 acceptance record](https://github.com/Missher12/Missher-DSH-Session-Bridge/blob/main/docs/compatibility/official-alpha5-20261017.md) for evidence layers and limits.
 
-There is no hard Host version gate: admission is capability-based, not version-based. The rc.2 development SDK pin is a development link only, not a compatibility gate.
+There is no package-wide Host version gate. The deletion companion separately checks the reviewed service implementations and refuses unknown ones. The rc.2 development SDK pin is a development link only, not a compatibility gate.
 
 The following records describe 0.1.3; they do not constitute 0.1.5 acceptance. On 2026-10-14, Linux x64 / Node 22.22.1, two actual **Missher community distributions** were exercised (both modified for this desktop product; neither is an unmodified official build):
 
@@ -109,7 +118,7 @@ The following records describe 0.1.3; they do not constitute 0.1.5 acceptance. O
 
 Deletion cannot be undone. To preserve history, normally quit every process using that data directory and back up the complete profile plus its configured persistence storage. Restore the same complete snapshot while all such processes are stopped; restoring one log alone is insufficient.
 
-Deletion depends on the optional `sessionController.deleteArchivedSession`. When it is missing the plugin does not invent a private deletion path and does not read private Host logs. The Host enforces the guards for running sessions, other writers and derived child sessions.
+Older releases depended on the optional Host deletion methods. Since 1.0.6, the reviewed companion described above also supplies the transaction when those methods are absent. Unknown compositions still refuse deletion.
 
 See `COMPATIBILITY.json` for the evidence layers. Version 0.1.3 builds in isolation on Linux and its 59 offline tests pass (0 failed, 0 skipped, worker 1); 12 of those are React and JSDOM chip/panel checks over controlled geometry, which are behavioural checks rather than pixel or browser layout evidence. `check-host-contracts` passes against the shared Host **source SDK declarations**; the inspected community packages lacked the corresponding declarations; official rc.4 npm packages now include them. Style ownership and peer reload/self reload/unload pass on the installed alpha.2 module system with the real Cordis Loader; the historical "unowned style gets claimed" negative control does not reproduce on this newer Host (owner is null), so that older failure description does not apply. Archive-delete confirm/cancel/delete are real rc.2 clicks over synthetic records: workspace files and other sessions are preserved, and the deletion survives a restart. Native Electron clicks, real-model calls, other official versions and other platforms are not accepted.
 
@@ -170,7 +179,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.5.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.6.tgz
 ```
 
 The SDK link is for development only and is neither committed nor packaged. The tarball contains compiled runtime files, corresponding source, licenses and user documentation; development scripts and historical local receipts remain in Git. The Node entry uses structural `ctx` services without runtime imports from `@deepseek-ai/dsh-*`. The client keeps three existing Host static requests: `react`, `react/jsx-runtime` and `@deepseek-ai/dsh-client-ui-primitives`. No runtime dependencies were added.

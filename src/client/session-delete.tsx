@@ -81,6 +81,7 @@ export function createSessionDeleteActions(send: typeof fetch = fetch, onDeleted
               'session/delete-busy': 'delete.busy',
               'session/delete-has-children': 'delete.children',
               'session/delete-not-found': 'delete.notFound',
+              'session/delete-cleanup-pending': 'delete.cleanupPending',
             } as Record<string, SessionBridgeKey>)[result.error?.code ?? '']) ?? 'delete.failed'
           publish({ sessionId, pending: false, done: false, error: key })
           return

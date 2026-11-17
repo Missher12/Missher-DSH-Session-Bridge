@@ -1,22 +1,44 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.5",
-  "candidateStatus": "1.0.5: unified native context-menu groups and icons, with legacy Host fallback.",
+  "packageVersion": "1.0.6",
+  "candidateStatus": "1.0.6: bundled deletion for the reviewed DSH 0.2.2-rc.3 JSONL composition, with native Host transactions preferred.",
   "hardHostVersionGate": false,
-  "change": "Join the native information group without duplicating the Host ID action; put deletion after archive in its own group and retain asynchronous capability, running-state and confirmation safeguards.",
+  "change": "Add an in-package deletion transaction using native writer leases, durable replay, lineage coordination and owner-mediated workspace/cache/index cleanup; preserve the 1.0.5 native menu groups and icons.",
   "currentChecks": {
-    "check": "pnpm run check passed: strict Host/client types, both builds, client Loader check and offline tests.",
+    "check": "pnpm run check: strict Host/client types, both builds, client Loader check and offline tests.",
     "offlineTests": {
-      "passed": 71,
+      "passed": 72,
       "failed": 0,
       "skipped": 15,
       "cancelled": 0,
       "concurrency": 1
     },
-    "regressions": "Three native-menu regressions failed before the fix and now pass: duplicate legacy contributions, missing native deletion, and unavailable deletion presentation.",
     "skips": "12 pre-existing chip tests and 3 scratch picker tests need optional full React/JSDOM SDK setup; the separate menu DOM check uses real Host React and primitives.",
-    "host": "DSH 0.2.2-rc.3 native registry, workspace contributions, renderer and primitives; controlled session stores and transport.",
-    "nativeAcceptance": "Native Electron inspection was unavailable because the computer-use app connection timed out; no native-click or pixel-layout claim."
+    "host": "Original installed DSH 0.2.2-rc.3 modules under the original Electron/Node runtime, macOS x64.",
+    "nativeComponents": [
+      "plain JSONL",
+      "zstd",
+      "normal deletion",
+      "archive and pin cleanup",
+      "durable workspace membership",
+      "workspace file preservation",
+      "native writer-lock inode preservation",
+      "foreign-process writer refusal",
+      "parent/child races",
+      "running, queued and unmanaged owner refusal",
+      "all stored generations",
+      "SQLite and unopened persistent SQLite",
+      "projection cache and late writebacks",
+      "interrupted cleanup replay",
+      "unload"
+    ],
+    "isolatedInstall": "Fresh desktop profile; official base and web bundles; only Session Bridge added through pluginManager.installBundle; no legacy sb-host patches. Authenticated HTTP deletes idle API-owned ordinary and archived Sessions; list and durable metadata checked.",
+    "nativeClicks": "Not tested. Full Host/profile HTTP acceptance is distinct from native window clicking.",
+    "untestedPlatforms": [
+      "Windows",
+      "Linux"
+    ],
+    "realModelCalls": "Not required or made."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -220,5 +242,28 @@
       "browser fixture stdin could not resolve JSX runtime; resolveDir bound to existing SDK ui-primitives"
     ]
   },
-  "previousDailyInstalledVersion": "1.0.0"
+  "previousDailyInstalledVersion": "1.0.0",
+  "deletionCompanion": {
+    "reviewedHostVersion": "0.2.2-rc.3",
+    "serviceImplementationChecks": true,
+    "nativeDeletePreferred": true,
+    "unknownComposition": "unsupported; other Bridge functions retain their capability checks",
+    "hostRuntimeImports": false,
+    "extraInstalledBundles": false,
+    "recovery": "Durable deletion intent is replayed when the companion starts; incomplete cleanup never returns success."
+  },
+  "previousMenuChecks_1_0_5": {
+    "check": "pnpm run check passed: strict Host/client types, both builds, client Loader check and offline tests.",
+    "offlineTests": {
+      "passed": 71,
+      "failed": 0,
+      "skipped": 15,
+      "cancelled": 0,
+      "concurrency": 1
+    },
+    "regressions": "Three native-menu regressions failed before the fix and now pass: duplicate legacy contributions, missing native deletion, and unavailable deletion presentation.",
+    "skips": "12 pre-existing chip tests and 3 scratch picker tests need optional full React/JSDOM SDK setup; the separate menu DOM check uses real Host React and primitives.",
+    "host": "DSH 0.2.2-rc.3 native registry, workspace contributions, renderer and primitives; controlled session stores and transport.",
+    "nativeAcceptance": "Native Electron inspection was unavailable because the computer-use app connection timed out; no native-click or pixel-layout claim."
+  }
 }

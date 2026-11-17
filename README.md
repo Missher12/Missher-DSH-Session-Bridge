@@ -6,7 +6,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**1.0.5**（侧栏拖放移动和删除会话，依赖宿主生命周期接口）。
+- 包名：`@missher/dsh-session-bridge`；版本：**1.0.6**（菜单分组、拖放移动与安全删除；已核对宿主可仅安装本插件启用删除）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -16,20 +16,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.5，下载 `missher-dsh-session-bridge-1.0.5.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.6，下载 `missher-dsh-session-bridge-1.0.6.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.5/missher-dsh-session-bridge-1.0.5.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.6/missher-dsh-session-bridge-1.0.6.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.6.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -42,7 +42,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.
 
 在 DSH 0.2.2-rc.3 的统一菜单中，常用操作、复制信息、归档和删除以轻分隔线分组，所有操作使用宿主图标；复制 ID 只显示宿主的一项。旧版宿主继续使用原有菜单入口。
 
-操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。宿主提供 `sessionController.deleteSession`（或旧的 `deleteArchivedSession`）与 `sessionController.moveSession` 时，删除进入确认，拖放调用同一移动事务；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。宿主缺少对应原子接口时删除入口禁用并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
+操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。宿主提供 `sessionController.deleteSession`（或旧的 `deleteArchivedSession`）与 `sessionController.moveSession` 时，删除进入确认，拖放调用同一移动事务；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。无原生删除接口时，1.0.6 在已核对的 DSH 0.2.2-rc.3 JSONL 组成上启用包内删除组件，不需要另装补丁。其他存储实现继续禁用删除并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
 
 ### 「不在工作区」与 scratch
 
@@ -79,6 +79,12 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.
 
 ## Host 与平台边界
 
+**1.0.6 独立安装删除：**插件优先使用宿主现有删除事务；缺少接口时，包内组件接入已核对的 0.2.2-rc.3 JSONL 存储、工作区、投影缓存与 SQLite 查询服务。它复用宿主原生写入锁，串行处理派生会话创建与父会话删除；运行中、排队、其他所有者占用或仍有派生会话时拒绝删除。空闲且由当前 API 控制器创建或恢复的会话会正常释放，再删除。
+
+删除意图先持久化，之后清除普通/压缩日志及历史代文件，并经各自所有者清理工作区、归档、置顶和索引。中断后由同一插件重放未完成清理；失败不会报告成功。保留最小删除标记和原生锁文件，避免会话 ID 被重新使用，工作区中的用户文件不删除。不要在清理未完成时移除插件；其他直接写存储的程序也必须遵循相同事务约定。
+
+后备删除只接受已核对的服务实现，宿主更新或其他扩展替换这些接口时会安全禁用，其他 Bridge 功能不受这个适配限制。拖放移动仍使用宿主的移动事务。本次在 macOS Intel 的原始 DSH 0.2.2-rc.3 运行件与全新隔离 profile 验证；Windows、Linux 和原生窗口点击尚未实测。历史记录中的能力缺失说明不代表 1.0.6 的这个适配后备路径。
+
 0.1.5 已核对官方 npm **DSH 0.2.1-rc.4** 的公开声明和实现：没有满足写入锁、并发派生会话与日志/索引一致性要求的永久删除接口，插件因此明确降级，不自行删除私有文件。官方有 `workspaces.insertBefore`，但它修改持久化排序，不是可释放的侧栏置底钩子；本插件保留宿主顺序，用户仍可用宿主拖拽排序。新会话选择器中的临时项仍在末尾。详见[接口调查与风险报告](docs/compatibility/official-rc4-0.1.5.md)。当前验证状态见 `COMPATIBILITY.json`；接口审计不等于官方宿主安装或 Electron 验收。
 
 0.1.5 的客户端类型、后端/客户端构建、模块加载、61 项离线测试及真实 React/JSDOM 交互均通过。浏览器合成夹具实点验证了缺能力、查询失败、确认返回 501、取消与合成成功；没有运行官方 rc.4 完整 Host 或 Electron。浏览器工具的虚拟剪贴板未能完成回读，完整复制字节仅在组件测试中验证。
@@ -89,7 +95,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.
 
 这次没有运行 alpha.5 的真实页面或原生 Electron 验收；此前社区版截图不是官方版 UI 证据。具体层次与限制见[官方 alpha.5 增量记录](https://github.com/Missher12/Missher-DSH-Session-Bridge/blob/main/docs/compatibility/official-alpha5-20261017.md)。
 
-没有宿主版本号硬限制：判定按能力，不按版本号。开发 SDK 的 rc.2 pin 只是开发链接，不是兼容范围门禁。
+Bridge 整体没有宿主版本号硬限制；包内删除适配另外核对服务实现，未知实现不启用。开发 SDK 的 rc.2 pin 只是开发链接，不是兼容范围门禁。
 
 以下为 0.1.3 的历史验证记录，不代表 1.0.1 已完成相同验收。2026-10-14 在 Linux x64 / Node 22.22.1 上实测两套 **Missher 社区发行版**（都是为该桌面产品改过的构建，不是未经改动的官方版）：
 
@@ -118,7 +124,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.5.
 
 删除不可撤销。需要保留记录时，应先正常退出所有使用该数据目录的进程，备份完整 profile 与其实际配置的持久化存储；恢复时也先正常退出，并整体恢复同一份快照，不能只补回单个日志文件。
 
-删除/移动能力依赖可选的 Host 生命周期接口：`sessionController.deleteSession`（优先）或 `deleteArchivedSession`（旧宿主），以及 `sessionController.moveSession`。缺失时插件不补私有删除路径，也不读取或改写 Host 私有日志、头或工作区表。运行中、被其他写入者占用、存在派生子会话以及移动目标校验由 Host 执行。当前官方 DSH 0.2.1-rc.4 没有这些接口；隔离的宿主源码补丁及其边界见 [host-lifecycle-patch-20261031.md](docs/compatibility/host-lifecycle-patch-20261031.md)。
+旧版依赖可选的 Host 生命周期接口：`sessionController.deleteSession`（优先）或 `deleteArchivedSession`（旧宿主），以及 `sessionController.moveSession`。1.0.6 起，已核对的 0.2.2-rc.3 还可使用上文的包内删除事务；其他未知组成继续拒绝删除，移动仍需 Host 接口。旧的独立宿主补丁记录见 [host-lifecycle-patch-20261031.md](docs/compatibility/host-lifecycle-patch-20261031.md)。
 
 验证层次见 `COMPATIBILITY.json`。0.1.3在 Linux 隔离构建，59 条离线测试全通过（0 失败 0 跳过，worker 1）；其中 12 条 chip/浮层测试是 React + JSDOM 的受控几何行为检查，不等于像素或浏览器布局证据。`check-host-contracts` 通过的是共享 Host **source SDK 声明**，当时核查的社区安装包未提供对应 `.d.ts`；官方 rc.4 npm 包已有声明。样式所有权与 peer reload/self reload/unload 在真实安装的 alpha.2 模块系统 + Cordis Loader 上通过；历史上“无主 style 被 claim”的负对照在新版不再复现（owner 为 null），旧故障复现说法不适用于本版。归档删除的确认/取消/删除为 rc.2 真实点击、仅合成记录，工作区文件与其他会话保留、重启后删除仍持久。原生 Electron 点击、真实模型调用、其他官方版本与其他平台未验收。
 
@@ -173,7 +179,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.5.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.6.tgz
 ```
 
 SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。

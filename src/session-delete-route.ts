@@ -1,18 +1,18 @@
 import type { HostContext, SessionControllerLike } from './dsh.ts'
 import type { ScratchConnection } from './scratch-route.ts'
 import { deletionSessionId, SESSION_DELETE_PATH } from './session-delete-wire.ts'
+import type { SessionDeletion } from './session-deletion.ts'
 
 /** Which Host-owned permanent deletion method this composition exposes. */
-type DeleteBackend = 'host-session' | 'host-archived'
+type DeleteBackend = 'host-session' | 'host-archived' | 'bridge-jsonl'
 
 /**
- * Expose only the Host's own deletion transaction; never infer private storage
- * paths. A Host without either method is reported unsupported, so the plugin
- * never deletes a JSONL file, an index row, or a workspace record itself.
+ * Prefer the Host transaction, then the reviewed in-package JSONL companion.
+ * Unknown compositions remain unsupported; requests never accept file paths.
  *
  * @param ctx - Host plugin context.
  */
-export function registerSessionDeleteRoute(ctx: HostContext): void {
+export function registerSessionDeleteRoute(ctx: HostContext, fallback: () => SessionDeletion | undefined = () => undefined): void {
   ctx.inject(['connection', 'sessionController'], scope => {
     const connection = scope.get('connection') as ScratchConnection
     const controller = scope.get('sessionController') as SessionControllerLike
@@ -26,7 +26,7 @@ export function registerSessionDeleteRoute(ctx: HostContext): void {
           try {
             if (closing) throw new Error('session/delete-busy')
             if (request.method === 'GET') {
-              const backend = deleteBackend(controller)
+              const backend = deleteBackend(controller, fallback())
               return Response.json(backend === undefined
                 ? { supported: false, reason: 'session/delete-unsupported' }
                 : { supported: true, backend },
@@ -37,14 +37,16 @@ export function registerSessionDeleteRoute(ctx: HostContext): void {
             }
             const sessionId = deletionSessionId(await request.json())
             request.signal.throwIfAborted()
-            const backend = deleteBackend(controller)
+            const companion = fallback()
+            const backend = deleteBackend(controller, companion)
             if (backend === undefined) {
               status = 501
               throw new Error('session/delete-unsupported')
             }
             const operation = backend === 'host-session'
               ? controller.deleteSession!(sessionId)
-              : controller.deleteArchivedSession!(sessionId)
+              : backend === 'host-archived' ? controller.deleteArchivedSession!(sessionId)
+                : companion!.deleteSession(sessionId)
             pending.add(operation)
             try { await operation } finally { pending.delete(operation) }
             return Response.json({ ok: true, value: { sessionId } }, { headers: { 'cache-control': 'no-store' } })
@@ -72,9 +74,10 @@ export function registerSessionDeleteRoute(ctx: HostContext): void {
  * @param controller - mounted Host Session controller.
  * @returns the preferred backend, or `undefined` when absent.
  */
-function deleteBackend(controller: SessionControllerLike): DeleteBackend | undefined {
+function deleteBackend(controller: SessionControllerLike, companion?: SessionDeletion): DeleteBackend | undefined {
   if (typeof controller.deleteSession === 'function') return 'host-session'
   if (typeof controller.deleteArchivedSession === 'function') return 'host-archived'
+  if (companion !== undefined) return 'bridge-jsonl'
   return undefined
 }
 

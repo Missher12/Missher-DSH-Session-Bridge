@@ -1,9 +1,9 @@
 import type { HostContext } from './dsh.ts';
+import type { SessionDeletion } from './session-deletion.ts';
 /**
- * Expose only the Host's own deletion transaction; never infer private storage
- * paths. A Host without either method is reported unsupported, so the plugin
- * never deletes a JSONL file, an index row, or a workspace record itself.
+ * Prefer the Host transaction, then the reviewed in-package JSONL companion.
+ * Unknown compositions remain unsupported; requests never accept file paths.
  *
  * @param ctx - Host plugin context.
  */
-export declare function registerSessionDeleteRoute(ctx: HostContext): void;
+export declare function registerSessionDeleteRoute(ctx: HostContext, fallback?: () => SessionDeletion | undefined): void;

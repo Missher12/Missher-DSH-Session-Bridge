@@ -52,7 +52,7 @@ it('reports an unsupported Host without inventing a private deletion path', asyn
   assert.deepEqual(deleted, [], 'capability lookup must never delete a session')
   assert.equal((await (await send({ sessionId: 'one', confirmed: true })).json()).ok, true)
   assert.deepEqual(deleted, ['one'])
-  for (const code of ['session/delete-active', 'session/delete-owned', 'session/delete-has-children', 'session/delete-not-archived']) {
+  for (const code of ['session/delete-active', 'session/delete-owned', 'session/delete-has-children', 'session/delete-not-archived', 'session/delete-cleanup-pending']) {
     controller.deleteArchivedSession = async () => { throw new HostLifecycleError(code) }
     const response = await send({ sessionId: 'one', confirmed: true })
     assert.equal(response.status, 409)
@@ -91,4 +91,32 @@ it('prefers the full-Session deletion method over the archived-only one', async 
   }))
   assert.equal(response.status, 200)
   assert.deepEqual(calls, [['session', 'session-two']], 'the broader Host transaction must win')
+})
+
+it('uses the ready companion only when the Host has no deletion transaction', async () => {
+  let route
+  let companion
+  const calls = []
+  const controller = {}
+  const ctx = {
+    inject(names, callback) { callback(this) },
+    get: key => key === 'sessionController' ? controller : {
+      fetch: { register(value) { route = value; return async () => {} } },
+    },
+    effect(start) { start() },
+  }
+  registerSessionDeleteRoute(ctx, () => companion)
+  const capability = () => route.fetch(new Request('http://localhost' + route.path)).then(r => r.json())
+  assert.equal((await capability()).supported, false)
+  companion = { async deleteSession(id) { calls.push(['companion', id]) } }
+  assert.deepEqual(await capability(), { supported: true, backend: 'bridge-jsonl' })
+  const remove = () => route.fetch(new Request('http://localhost' + route.path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session-one', confirmed: true }),
+  }))
+  assert.equal((await remove()).status, 200)
+  controller.deleteSession = async id => { calls.push(['host', id]) }
+  assert.equal((await capability()).backend, 'host-session')
+  assert.equal((await remove()).status, 200)
+  assert.deepEqual(calls, [['companion', 'session-one'], ['host', 'session-one']])
 })
