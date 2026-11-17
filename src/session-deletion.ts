@@ -19,9 +19,21 @@ const REVIEWED = {
   sessionProjectionCache: 'd2be1d374a7320e09e837ea912a40aadf4e34e532f7b3e7826ab994948b5a83b',
   sessionQuery: '442848396e7bcd64362ce13ee0322bb2c38ca8153d73ead968c806c67c98eb58',
 } as const
+// The installed 0.1.0 persistence/workspace pair has native lifecycle locks
+// and move overrides. Its controller deletion method is unsafe and is bypassed.
+const LEGACY = {
+  sessionPersistence: '26d5c499ca2781c8f02604a727cb0f2b376a48a8fd56e5de939f8194592a1063',
+  workspaceRegistry: '924f5bcc2e7fe8e71eddf306781a7797aac9b96c4dd4dd59f514548765e6b59c',
+  lease: '4299bd33a2590fe367b40e9b0129ce89a402464b2764d14633c59ba88e9acc0c',
+  owner: 'c5339e44a6d5930d8d46afb70490c9d842b6de99440ee25131fac4c65ca52126',
+  registry: 'c91556bb3126a811df40e319ccb98ffba75a119c79d8c97c33999f4c478da0f2',
+  deleteSession: '703ae11c5b1f96b83f379b5c70325a4d7be7a90af627aed8116358fb33de57d5',
+  deleteArchivedSession: '1c887f0de84ecab08d155d7a220da542a812ff9b329af3c7f84111307ff271ed',
+} as const
 
 interface Header { id: string; parentSession?: string }
 interface Lease { release(): Promise<void> }
+interface LeaseClass { acquire(directory: string, id: string, filename: string): Promise<Lease> }
 interface Handle { flush(): Promise<void>; close(): Promise<void> }
 interface Persistence {
   root: string
@@ -32,6 +44,7 @@ interface Persistence {
   findLog(id: string, signal?: AbortSignal): Promise<{ currentPath: string } | undefined>
   list(): Promise<{ header: Header }[]>
   stat(id: string): Promise<unknown>
+  writeDeletionTombstone?(directory: string, id: string): Promise<void>
 }
 interface Workspace {
   headers: Map<string, Header>
@@ -42,6 +55,7 @@ interface Workspace {
   enqueueOperation<T>(operation: () => Promise<T>): Promise<T>
   requireState(): { archivedSessionIds: string[]; pinnedSessionIds: string[] }
   setState(state: ReturnType<Workspace['requireState']>): Promise<void>
+  detachSession?(id: string): Promise<void>
 }
 interface Query {
   config: { path: string }
@@ -68,12 +82,21 @@ function refuse(reason: string): never { throw new Error(`session/delete-${reaso
 function missing(error: unknown): boolean { return (error as NodeJS.ErrnoException)?.code === 'ENOENT' }
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex')
 
-/** Install only for a known composition that has no Host-owned deletion API. */
+/** Do not advertise the known 0.1.0 controller while the safe adapter is absent. */
+export function hasLegacyDeletion(controller: object): boolean {
+  return (['deleteSession', 'deleteArchivedSession'] as const).some(key => {
+    const value: unknown = Object.getOwnPropertyDescriptor(controller, key)?.value
+    return typeof value === 'function' && digest(value.toString()) === LEGACY[key]
+  })
+}
+
+/** Install for a reviewed composition, including the old lifecycle decorator. */
 export function registerSessionDeletion(ctx: HostContext): () => SessionDeletion | undefined {
   let available: SessionDeletion | undefined
   ctx.inject(['sessionPersistence', 'workspaceRegistry', 'sessionProjectionCache', 'sessionQuery', 'sessionController', 'agents', 'sessions'], scope => {
     const controller = scope.get('sessionController') as { deleteSession?: unknown; deleteArchivedSession?: unknown }
-    if (typeof controller.deleteSession === 'function' || typeof controller.deleteArchivedSession === 'function') return
+    if (!hasLegacyDeletion(controller)
+      && (typeof controller.deleteSession === 'function' || typeof controller.deleteArchivedSession === 'function')) return
     scope.effect(() => {
       let adapter: JsonlDeletion | undefined
       let closing = false
@@ -82,7 +105,11 @@ export function registerSessionDeletion(ctx: HostContext): () => SessionDeletion
           adapter = new JsonlDeletion(scope)
           await adapter.initialize()
           if (!closing) available = adapter
-        } catch (error) { warn(scope, `session-bridge: deletion companion unavailable: ${String(error)}`) }
+        } catch (error) {
+          await adapter?.dispose()
+          adapter = undefined
+          warn(scope, `session-bridge: deletion companion unavailable: ${String(error)}`)
+        }
       })()
       return async () => {
         closing = true
@@ -102,6 +129,8 @@ export class JsonlDeletion implements SessionDeletion {
   private readonly query: Query
   private readonly cache: Cache | undefined
   private readonly agents: Agents
+  private readonly legacy: boolean
+  private leaseClass?: LeaseClass
   private root = ''
   private records = ''
   private lockDirectory = ''
@@ -114,10 +143,14 @@ export class JsonlDeletion implements SessionDeletion {
   private readonly restore: (() => void)[] = []
 
   constructor(private readonly ctx: HostContext) {
+    const storage = ctx.get('sessionPersistence')
+    this.legacy = storage !== undefined
+      && digest(Object.getPrototypeOf(storage).constructor.toString()) === LEGACY.sessionPersistence
     for (const [name, fingerprint] of Object.entries(REVIEWED)) {
       const service = ctx.get(name)
       if (name === 'sessionProjectionCache' && service === undefined) continue
-      if (service === undefined || digest(Object.getPrototypeOf(service).constructor.toString()) !== fingerprint) {
+      const expected = this.legacy && (name === 'sessionPersistence' || name === 'workspaceRegistry') ? LEGACY[name] : fingerprint
+      if (service === undefined || digest(Object.getPrototypeOf(service).constructor.toString()) !== expected) {
         refuse('unsupported')
       }
     }
@@ -152,7 +185,13 @@ export class JsonlDeletion implements SessionDeletion {
         if (!/^[a-f0-9]{64}\.json$/u.test(name)) continue
         const record = await this.readRecord(join(this.records, name))
         if (digest(record.id) + '.json' !== name) refuse('unsupported')
-        if (!record.done) await this.complete(record)
+        if (!record.done) {
+          try { await this.complete(record) } catch (error) {
+            if (!(error instanceof Error) || error.message !== 'session/delete-cleanup-pending') throw error
+            // Keep the route available for an explicit retry after an owner recovers.
+            warn(this.ctx, `session-bridge: cleanup pending for ${record.id}`)
+          }
+        }
       }
     })
   }
@@ -173,8 +212,7 @@ export class JsonlDeletion implements SessionDeletion {
         waterfall(name: string, request: { sessionId: string }, fallback: () => Promise<unknown[]>): Promise<unknown[]>
       }
       if ((await ctx.waterfall('workspace/session-activity', { sessionId: id }, async () => [])).length) refuse('active')
-      if ((await this.persistence.list()).some(row => row.header.parentSession === id)
-        || this.agents.list().some(item => item.session.header.parentSession === id)) refuse('has-children')
+      await this.assertNoChildren(id)
       if (agent !== undefined) {
         if (agent.status === 'running' || agent.inbox.nextTurn.length || agent.inbox.nextStep.length) refuse('active')
         await this.handles.get(id)!.dispose()
@@ -184,17 +222,25 @@ export class JsonlDeletion implements SessionDeletion {
       if (this.agents.get(id) !== undefined || sessions.get(id) !== undefined) refuse('owned')
       this.persistence.tracker.claimWrite(id)
       let lease: Lease | undefined
+      let lifecycle: Lease | undefined
       try {
         const found = await this.persistence.findLog(id)
         if (found === undefined) refuse('not-found')
         const directory = await this.sessionDirectory(relative(resolve(this.persistence.root), dirname(found.currentPath)))
+        if (this.legacy) {
+          lifecycle = await this.leaseClass!.acquire(directory, id, 'session.lifecycle.lock')
+          // Older writers coordinate parent/child creation with this native lock.
+          await this.assertNoChildren(id)
+        }
         lease = await this.persistence.acquireLease(id, undefined, directory)
         await this.artifacts(directory) // reject unfamiliar files before committing intent
         const record: Journal = { version: 1, id, directory: relative(this.root, directory), done: false }
         await this.writeRecord(record)
         await this.cleanup(record, directory)
       } finally {
-        try { await lease?.release() } finally { this.persistence.tracker.releaseClaim(id) }
+        try { await lease?.release() } finally {
+          try { await lifecycle?.release() } finally { this.persistence.tracker.releaseClaim(id) }
+        }
       }
     })
     this.pending.add(operation)
@@ -211,11 +257,12 @@ export class JsonlDeletion implements SessionDeletion {
 
   /** Preserve the caller's traced `this`; never bind registry methods to our scope. */
   private wrap<T extends object, K extends keyof T>(target: T, key: K,
-    wrap: (original: (...args: never[]) => unknown) => (...args: never[]) => unknown): void {
+    wrap: (original: (...args: never[]) => unknown) => (...args: never[]) => unknown, reviewedWrapper?: string): void {
     const previous = Object.getOwnPropertyDescriptor(target, key)
-    // A different extension already replacing this seam is not the reviewed
-    // composition. In particular, never stack two deletion companions.
-    if (previous !== undefined) refuse('unsupported')
+    // Only the exact reviewed lifecycle wrappers may be layered. Unknown
+    // extensions and another Bridge adapter still refuse, without replacing them.
+    if (previous !== undefined && (reviewedWrapper === undefined || typeof previous.value !== 'function'
+      || digest(previous.value.toString()) !== reviewedWrapper)) refuse('unsupported')
     let owner: object | null = target
     let descriptor: PropertyDescriptor | undefined = previous
     while (descriptor === undefined && (owner = Object.getPrototypeOf(owner)) !== null) {
@@ -223,10 +270,11 @@ export class JsonlDeletion implements SessionDeletion {
     }
     if (typeof descriptor?.value !== 'function') refuse('unsupported')
     const value = wrap(descriptor.value as (...args: never[]) => unknown)
-    Object.defineProperty(target, key, { configurable: true, writable: true, value })
+    Object.defineProperty(target, key, { configurable: true, writable: true, enumerable: previous?.enumerable ?? false, value })
     this.restore.push(() => {
       if (Object.getOwnPropertyDescriptor(target, key)?.value !== value) return
-      Reflect.deleteProperty(target, key)
+      if (previous !== undefined) Object.defineProperty(target, key, previous)
+      else Reflect.deleteProperty(target, key)
     })
   }
 
@@ -294,14 +342,14 @@ export class JsonlDeletion implements SessionDeletion {
         return adapter.ownership.run(token, async () => {
           try { return await Reflect.apply(original, this, args) } finally { token.active = false }
         })
-      })
+      }, this.legacy && key !== 'fork' ? LEGACY.owner : undefined)
     }
     for (const key of ['create', 'resume'] as const) {
       this.wrap(this.agents as Agents & Record<typeof key, unknown>, key, original => async function (this: object, ...args: never[]) {
         const handle = await Reflect.apply(original, this, args) as AgentHandle
         if (adapter.ownership.getStore()?.active) adapter.handles.set(handle.agent.id, handle)
         return handle
-      })
+      }, this.legacy ? LEGACY.registry : undefined)
     }
     this.restore.push(this.ctx.on('agent/disposed', ((event: { agent: Agent }) => {
       if (this.handles.get(event.agent.id)?.agent === event.agent) this.handles.delete(event.agent.id)
@@ -318,7 +366,14 @@ export class JsonlDeletion implements SessionDeletion {
           await delay(50)
         }
       }
-      try { return await operation() } finally { await lease.release() }
+      try {
+        if (this.legacy && this.leaseClass === undefined) {
+          const constructor = Object.getPrototypeOf(lease).constructor as LeaseClass
+          if (digest(constructor.toString()) !== LEGACY.lease) refuse('unsupported')
+          this.leaseClass = constructor
+        }
+        return await operation()
+      } finally { await lease.release() }
     })
     this.tail = result.catch(() => {})
     return result
@@ -362,7 +417,9 @@ export class JsonlDeletion implements SessionDeletion {
     const files = []
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (entry.name === 'session.lock' && entry.isFile()) continue
-      if (!entry.isFile() || !/^session\.(?:v\d+\.jsonl(?:\.zstd)?|migration\.[\w-]+\.jsonl(?:\.zstd)?\.tmp)$/u.test(entry.name)) {
+      if (this.legacy && entry.isFile() && ['session.lifecycle.lock', 'session.deleted'].includes(entry.name)) continue
+      if (!entry.isFile() || (!/^session\.(?:v\d+\.jsonl(?:\.zstd)?|migration\.[\w-]+\.jsonl(?:\.zstd)?\.tmp)$/u.test(entry.name)
+        && !(this.legacy && /^session\.deleted\.\d+\.[a-f0-9]{12}$/u.test(entry.name)))) {
         refuse('unsupported')
       }
       files.push(join(directory, entry.name))
@@ -374,21 +431,33 @@ export class JsonlDeletion implements SessionDeletion {
     const directory = await this.sessionDirectory(record.directory)
     this.persistence.tracker.claimWrite(record.id)
     let lease: Lease | undefined
+    let lifecycle: Lease | undefined
     try {
+      if (this.legacy) {
+        lifecycle = await this.leaseClass!.acquire(directory, record.id, 'session.lifecycle.lock')
+        await this.assertNoChildren(record.id)
+      }
       lease = await this.persistence.acquireLease(record.id, undefined, directory)
       await this.cleanup(record, directory)
     } finally {
-      try { await lease?.release() } finally { this.persistence.tracker.releaseClaim(record.id) }
+      try { await lease?.release() } finally {
+        try { await lifecycle?.release() } finally { this.persistence.tracker.releaseClaim(record.id) }
+      }
     }
   }
 
   private async cleanup(record: Journal, directory: string): Promise<void> {
     try {
+      if (this.legacy) await this.persistence.writeDeletionTombstone!(directory, record.id)
       for (const path of await this.artifacts(directory)) await unlink(path)
       await this.syncDirectory(directory)
       this.persistence.coldLogMemo.delete(record.id)
       this.persistence.migrationPreparations.delete(record.id)
-      await this.workspace.enqueueOperation(async () => {
+      if (this.legacy) {
+        this.forgetHeader(record.id)
+        // The legacy owner also clears durable move overrides and its journal.
+        await this.workspace.detachSession!(record.id)
+      } else await this.workspace.enqueueOperation(async () => {
         this.forgetHeader(record.id)
         for (const workspace of this.workspace.list()) await workspace.detachSession(record.id)
         const state = this.workspace.requireState()
@@ -411,6 +480,11 @@ export class JsonlDeletion implements SessionDeletion {
     } catch (error) {
       throw new Error('session/delete-cleanup-pending', { cause: error })
     }
+  }
+
+  private async assertNoChildren(id: string): Promise<void> {
+    if ((await this.persistence.list()).some(row => row.header.parentSession === id)
+      || this.agents.list().some(item => item.session.header.parentSession === id)) refuse('has-children')
   }
 
   private forgetHeader(id: string): void {

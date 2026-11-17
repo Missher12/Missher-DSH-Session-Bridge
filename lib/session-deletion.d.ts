@@ -2,7 +2,9 @@ import type { HostContext } from './dsh.ts';
 export interface SessionDeletion {
     deleteSession(id: string): Promise<void>;
 }
-/** Install only for a known composition that has no Host-owned deletion API. */
+/** Do not advertise the known 0.1.0 controller while the safe adapter is absent. */
+export declare function hasLegacyDeletion(controller: object): boolean;
+/** Install for a reviewed composition, including the old lifecycle decorator. */
 export declare function registerSessionDeletion(ctx: HostContext): () => SessionDeletion | undefined;
 /** One reviewed service instance; exported for genuine Host integration checks. */
 export declare class JsonlDeletion implements SessionDeletion {
@@ -12,6 +14,8 @@ export declare class JsonlDeletion implements SessionDeletion {
     private readonly query;
     private readonly cache;
     private readonly agents;
+    private readonly legacy;
+    private leaseClass?;
     private root;
     private records;
     private lockDirectory;
@@ -38,6 +42,7 @@ export declare class JsonlDeletion implements SessionDeletion {
     private artifacts;
     private complete;
     private cleanup;
+    private assertNoChildren;
     private forgetHeader;
     private syncDirectory;
 }

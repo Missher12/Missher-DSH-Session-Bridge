@@ -1,13 +1,13 @@
 import type { HostContext, SessionControllerLike } from './dsh.ts'
 import type { ScratchConnection } from './scratch-route.ts'
 import { deletionSessionId, SESSION_DELETE_PATH } from './session-delete-wire.ts'
-import type { SessionDeletion } from './session-deletion.ts'
+import { hasLegacyDeletion, type SessionDeletion } from './session-deletion.ts'
 
 /** Which Host-owned permanent deletion method this composition exposes. */
 type DeleteBackend = 'host-session' | 'host-archived' | 'bridge-jsonl'
 
 /**
- * Prefer the Host transaction, then the reviewed in-package JSONL companion.
+ * Prefer the reviewed companion. Never fall back to the unsafe 0.1.0 decorator.
  * Unknown compositions remain unsupported; requests never accept file paths.
  *
  * @param ctx - Host plugin context.
@@ -75,9 +75,10 @@ export function registerSessionDeleteRoute(ctx: HostContext, fallback: () => Ses
  * @returns the preferred backend, or `undefined` when absent.
  */
 function deleteBackend(controller: SessionControllerLike, companion?: SessionDeletion): DeleteBackend | undefined {
+  if (companion !== undefined) return 'bridge-jsonl'
+  if (hasLegacyDeletion(controller)) return undefined
   if (typeof controller.deleteSession === 'function') return 'host-session'
   if (typeof controller.deleteArchivedSession === 'function') return 'host-archived'
-  if (companion !== undefined) return 'bridge-jsonl'
   return undefined
 }
 

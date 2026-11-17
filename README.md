@@ -6,7 +6,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**1.0.6**（菜单分组、拖放移动与安全删除；已核对宿主可仅安装本插件启用删除）。
+- 包名：`@missher/dsh-session-bridge`；版本：**1.0.7**（菜单分组、拖放移动与安全删除；已核对宿主可仅安装本插件启用删除）。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -16,20 +16,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.6，下载 `missher-dsh-session-bridge-1.0.6.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.7，下载 `missher-dsh-session-bridge-1.0.7.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.6/missher-dsh-session-bridge-1.0.6.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.7/missher-dsh-session-bridge-1.0.7.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.6.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.7.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -42,7 +42,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.6.
 
 在 DSH 0.2.2-rc.3 的统一菜单中，常用操作、复制信息、归档和删除以轻分隔线分组，所有操作使用宿主图标；复制 ID 只显示宿主的一项。旧版宿主继续使用原有菜单入口。
 
-操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。宿主提供 `sessionController.deleteSession`（或旧的 `deleteArchivedSession`）与 `sessionController.moveSession` 时，删除进入确认，拖放调用同一移动事务；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。无原生删除接口时，1.0.6 在已核对的 DSH 0.2.2-rc.3 JSONL 组成上启用包内删除组件，不需要另装补丁。其他存储实现继续禁用删除并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
+操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。删除使用可用的安全事务并进入确认，拖放调用宿主的 `sessionController.moveSession`；删除确认说明不可撤销、工作区文件保留，拖动只改变会话归属与后续工作目录。1.0.7 在已核对的 DSH 0.2.2-rc.3 JSONL 组成上使用包内删除组件，包括已安装旧 0.1.0 存储/工作区组件的组合，不需要另装补丁；不会退回已知不安全的旧删除入口。其他存储实现继续禁用删除并显示原因；移动失败、运行中拒绝或同一工作区拖放分别处理，失败不会显示成功。
 
 ### 「不在工作区」与 scratch
 
@@ -79,11 +79,11 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.6.
 
 ## Host 与平台边界
 
-**1.0.6 独立安装删除：**插件优先使用宿主现有删除事务；缺少接口时，包内组件接入已核对的 0.2.2-rc.3 JSONL 存储、工作区、投影缓存与 SQLite 查询服务。它复用宿主原生写入锁，串行处理派生会话创建与父会话删除；运行中、排队、其他所有者占用或仍有派生会话时拒绝删除。空闲且由当前 API 控制器创建或恢复的会话会正常释放，再删除。
+**1.0.7 删除安全修复：**在已核对的 0.2.2-rc.3 原始 JSONL 组成与旧 0.1.0 存储/工作区组合上，菜单和 Bridge HTTP 优先使用包内事务，绕过会忽略排队状态、吞掉工作区清理错误的旧生命周期删除入口。它复用宿主原生写入锁，串行处理派生会话创建与父会话删除；运行中、排队、其他所有者占用或仍有派生会话时拒绝删除。空闲且由当前 API 控制器创建或恢复的会话会正常释放，再删除。
 
-删除意图先持久化，之后清除普通/压缩日志及历史代文件，并经各自所有者清理工作区、归档、置顶和索引。中断后由同一插件重放未完成清理；失败不会报告成功。保留最小删除标记和原生锁文件，避免会话 ID 被重新使用，工作区中的用户文件不删除。不要在清理未完成时移除插件；其他直接写存储的程序也必须遵循相同事务约定。
+删除意图先持久化，之后清除普通/压缩日志及历史代文件，并经各自所有者清理工作区、归档、置顶和索引。中断后由同一插件重放未完成清理；清理失败明确返回“清理待完成”，保留删除意图并支持重试，不会报告成功。旧组件组合同时清除移动归属覆盖，并保留其原生派生关系锁与删除标记。保留最小删除标记和原生锁文件，避免会话 ID 被重新使用，工作区中的用户文件不删除。不要在清理未完成时移除插件；其他直接写存储的程序也必须遵循相同事务约定。
 
-后备删除只接受已核对的服务实现，宿主更新或其他扩展替换这些接口时会安全禁用，其他 Bridge 功能不受这个适配限制。拖放移动仍使用宿主的移动事务。本次在 macOS Intel 的原始 DSH 0.2.2-rc.3 运行件与全新隔离 profile 验证；Windows、Linux 和原生窗口点击尚未实测。历史记录中的能力缺失说明不代表 1.0.6 的这个适配后备路径。
+后备删除只接受已核对的服务实现，宿主更新或其他扩展替换这些接口时会安全禁用，其他 Bridge 功能不受这个适配限制。拖放移动仍使用宿主的移动事务。本次在 macOS Intel 的原始 DSH 0.2.2-rc.3 运行件、旧组件组合及隔离 profile 验证；Windows、Linux 和原生窗口点击尚未实测。旧 0.1.0 组件没有被修改或卸载；其他程序直接调用它的删除接口仍不在本次修复范围内。官方 0.2.1-rc.4 的删除/移动仍不支持，版本检查没有放宽。
 
 0.1.5 已核对官方 npm **DSH 0.2.1-rc.4** 的公开声明和实现：没有满足写入锁、并发派生会话与日志/索引一致性要求的永久删除接口，插件因此明确降级，不自行删除私有文件。官方有 `workspaces.insertBefore`，但它修改持久化排序，不是可释放的侧栏置底钩子；本插件保留宿主顺序，用户仍可用宿主拖拽排序。新会话选择器中的临时项仍在末尾。详见[接口调查与风险报告](docs/compatibility/official-rc4-0.1.5.md)。当前验证状态见 `COMPATIBILITY.json`；接口审计不等于官方宿主安装或 Electron 验收。
 
@@ -179,7 +179,7 @@ pnpm run typecheck
 pnpm run build
 node --test --test-concurrency=1 "tests/*.test.mjs"
 pnpm pack --pack-destination ./dist
-node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.6.tgz
+node scripts/check-package-boundary.mjs ./dist/missher-dsh-session-bridge-1.0.7.tgz
 ```
 
 SDK 链接只用于开发，不提交或进入 tarball。安装包包含预构建运行文件、对应源码、许可证及用户说明；开发脚本和历史本机回执留在 Git 仓库。Node 半边仅使用结构化 `ctx` 服务，不运行时导入任何 `@deepseek-ai/dsh-*`。客户端保留三个 Host 静态请求：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；没有新增运行时依赖。

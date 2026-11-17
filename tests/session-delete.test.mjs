@@ -93,7 +93,7 @@ it('prefers the full-Session deletion method over the archived-only one', async 
   assert.deepEqual(calls, [['session', 'session-two']], 'the broader Host transaction must win')
 })
 
-it('uses the ready companion only when the Host has no deletion transaction', async () => {
+it('prefers the reviewed companion over an advertised Host deletion method', async () => {
   let route
   let companion
   const calls = []
@@ -116,7 +116,37 @@ it('uses the ready companion only when the Host has no deletion transaction', as
   }))
   assert.equal((await remove()).status, 200)
   controller.deleteSession = async id => { calls.push(['host', id]) }
-  assert.equal((await capability()).backend, 'host-session')
+  assert.equal((await capability()).backend, 'bridge-jsonl')
   assert.equal((await remove()).status, 200)
-  assert.deepEqual(calls, [['companion', 'session-one'], ['host', 'session-one']])
+  assert.deepEqual(calls, [['companion', 'session-one'], ['companion', 'session-one']])
+})
+
+it('never falls back to the known unsafe lifecycle 0.1.0 while its companion is unavailable', async () => {
+  let route, companion
+  let unsafeCalls = 0
+  const inLineage = (_id, operation) => operation()
+  const lifecycle = { deleteSession: async () => { unsafeCalls++ } }
+  // Exact installed 0.1.0 decorator; its closure swallows workspace failures.
+  const deleteSession = (sessionId) => inLineage(sessionId, () => lifecycle.deleteSession(sessionId));
+  const controller = { deleteSession }
+  registerSessionDeleteRoute({
+    inject(_names, callback) { callback(this) },
+    get: key => key === 'sessionController' ? controller : {
+      fetch: { register(value) { route = value; return () => {} } },
+    },
+    effect(start) { start() },
+  }, () => companion)
+  const remove = () => route.fetch(new Request('http://localhost' + route.path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session-legacy', confirmed: true }),
+  }))
+  assert.equal((await (await route.fetch(new Request('http://localhost' + route.path))).json()).supported, false)
+  assert.equal((await remove()).status, 501)
+  companion = { async deleteSession() { throw new Error('session/delete-cleanup-pending') } }
+  const response = await remove()
+  assert.equal(response.status, 409)
+  assert.equal((await response.json()).error.code, 'session/delete-cleanup-pending')
+  companion = undefined
+  assert.equal((await remove()).status, 501)
+  assert.equal(unsafeCalls, 0)
 })
