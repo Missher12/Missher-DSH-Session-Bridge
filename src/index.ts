@@ -182,8 +182,9 @@ export function apply(ctx: HostContext, config: Config = {}): void {
   registerBridgeTools(ctx, policy)
   ctx.inject(['commands'], scope => { registerBridgeCommands(scope, policy) })
   registerScratchRoute(ctx, resolved.scratchRoot)
-  registerSessionDeleteRoute(ctx, registerSessionDeletion(ctx))
-  registerSessionMoveRoute(ctx)
+  const lifecycle = registerSessionDeletion(ctx)
+  registerSessionDeleteRoute(ctx, lifecycle)
+  registerSessionMoveRoute(ctx, lifecycle)
 
   if (!resolved.announceSessionId) {
     info(ctx, `session-bridge: ready · scratch root ${resolved.scratchRoot} · own-session-id prompt section disabled`)

@@ -2,15 +2,10 @@ import type { HostContext, SessionControllerLike } from './dsh.ts'
 import type { ScratchConnection } from './scratch-route.ts'
 import { SESSION_MOVE_PATH, moveSessionRequest } from './session-move-wire.ts'
 
-/**
- * Expose only the Host's own Session move transaction; never rewrite a header,
- * a JSONL file, or workspace accounting from the plugin. A Host without
- * `sessionController.moveSession` is reported unsupported, so the plugin never
- * fakes a move by re-creating a Session.
- *
- * @param ctx - Host plugin context.
- */
-export function registerSessionMoveRoute(ctx: HostContext): void {
+interface SessionMovement { canMove: boolean; moveSession(id: string, targetId: string): Promise<void> }
+
+/** Use the Host transaction or the reviewed in-package workspace adapter. */
+export function registerSessionMoveRoute(ctx: HostContext, fallback: () => SessionMovement | undefined = () => undefined): void {
   ctx.inject(['connection', 'sessionController'], scope => {
     const connection = scope.get('connection') as ScratchConnection
     const controller = scope.get('sessionController') as SessionControllerLike
@@ -24,8 +19,10 @@ export function registerSessionMoveRoute(ctx: HostContext): void {
           try {
             if (closing) throw new Error('session/move-busy')
             if (request.method === 'GET') {
-              return Response.json(typeof controller.moveSession === 'function'
-                ? { supported: true, backend: 'host' }
+              const backend = typeof controller.moveSession === 'function' ? 'host'
+                : fallback()?.canMove === true ? 'bridge-jsonl' : undefined
+              return Response.json(backend !== undefined
+                ? { supported: true, backend }
                 : { supported: false, reason: 'session/move-unsupported' },
               { headers: { 'cache-control': 'no-store' } })
             }
@@ -34,11 +31,12 @@ export function registerSessionMoveRoute(ctx: HostContext): void {
             }
             const move = moveSessionRequest(await request.json())
             request.signal.throwIfAborted()
-            if (typeof controller.moveSession !== 'function') {
+            const backend = typeof controller.moveSession === 'function' ? controller : fallback()
+            if (backend === undefined || ('canMove' in backend && !backend.canMove) || typeof backend.moveSession !== 'function') {
               status = 501
               throw new Error('session/move-unsupported')
             }
-            const operation = controller.moveSession(move.sessionId, move.targetWorkspaceId)
+            const operation = backend.moveSession(move.sessionId, move.targetWorkspaceId)
             pending.add(operation)
             try { await operation } finally { pending.delete(operation) }
             return Response.json({

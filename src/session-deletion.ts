@@ -1,5 +1,5 @@
 /**
- * In-package deletion companion for the reviewed 0.2.2-rc.3 JSONL composition.
+ * In-package session lifecycle companion for reviewed DSH JSONL compositions.
  * No Host code or native addon is copied. The existing owners supply writer
  * leases, write queues and index reconciliation. Unknown implementations refuse.
  */
@@ -19,6 +19,11 @@ const REVIEWED = {
   sessionProjectionCache: 'd2be1d374a7320e09e837ea912a40aadf4e34e532f7b3e7826ab994948b5a83b',
   sessionQuery: '442848396e7bcd64362ce13ee0322bb2c38ca8153d73ead968c806c67c98eb58',
 } as const
+const REVIEWED_PLACEMENT = {
+  controllerOwner: '7c5074f7b7c455ec7c0903f43cbb37381190b7bd554bccbff74296a3e329a6e7',
+  candidateMatches: 'b5d795301ea6097279d6823691924c40bb491efc042237708199a60da268a375',
+  readSessionHeader: '041207d502053392281e4e21775f42b1458acec9cfe2df00667576b92abd53d3',
+} as const
 // The installed 0.1.0 persistence/workspace pair has native lifecycle locks
 // and move overrides. Its controller deletion method is unsafe and is bypassed.
 const LEGACY = {
@@ -31,10 +36,16 @@ const LEGACY = {
   deleteArchivedSession: '1c887f0de84ecab08d155d7a220da542a812ff9b329af3c7f84111307ff271ed',
 } as const
 
-interface Header { id: string; parentSession?: string }
+interface Header { id: string; cwd?: string; parentSession?: string }
 interface Lease { release(): Promise<void> }
 interface LeaseClass { acquire(directory: string, id: string, filename: string): Promise<Lease> }
 interface Handle { flush(): Promise<void>; close(): Promise<void> }
+interface WorkingDirectoryChange { type: 'working-directory/change'; seq: number; time: number; data: { cwd: string } }
+interface MoveHandle extends Handle {
+  header: Header
+  read(): Promise<{ events: readonly { type: string; data?: { cwd?: string } }[] }>
+  append(events: readonly WorkingDirectoryChange[]): Promise<void>
+}
 interface Persistence {
   root: string
   tracker: { claimWrite(id: string): void; releaseClaim(id: string): void }
@@ -43,15 +54,29 @@ interface Persistence {
   acquireLease(id: string, cwd: undefined, dir: string): Promise<Lease>
   findLog(id: string, signal?: AbortSignal): Promise<{ currentPath: string } | undefined>
   list(): Promise<{ header: Header }[]>
-  stat(id: string): Promise<unknown>
+  stat(id: string): Promise<{ header: Header } | undefined>
+  open(id: string, access: 'read' | 'write'): Promise<MoveHandle>
   writeDeletionTombstone?(directory: string, id: string): Promise<void>
+}
+interface WorkspaceEntity {
+  id: string
+  path: string
+  sessionIds: readonly string[]
+  attachSession(id: string): Promise<void>
+  detachSession(id: string): Promise<void>
 }
 interface Workspace {
   headers: Map<string, Header>
   sessionPaths: Map<string, string>
   missingSessionPaths: Set<string>
   invalidSessionPaths: Map<string, string>
-  list(): { sessionIds: readonly string[]; detachSession(id: string): Promise<void> }[]
+  list(): WorkspaceEntity[]
+  get(id: string): WorkspaceEntity | undefined
+  requireTable(): { get(id: string): { sessionIds: readonly string[] } | undefined }
+  host: {
+    candidateMatches(id: string, path: string): boolean
+    readSessionHeader(id: string): Promise<Header>
+  }
   enqueueOperation<T>(operation: () => Promise<T>): Promise<T>
   requireState(): { archivedSessionIds: string[]; pinnedSessionIds: string[] }
   setState(state: ReturnType<Workspace['requireState']>): Promise<void>
@@ -59,6 +84,11 @@ interface Workspace {
 }
 interface Query {
   config: { path: string }
+  observeSession(id: string): Promise<{
+    events: readonly { type: string }[]
+    projections?: { values: { inbox?: { 'next-turn': readonly unknown[]; 'next-step': readonly unknown[] } } }
+    [Symbol.dispose](): void
+  }>
   _db?: unknown
   _observations: { cache: Map<string, unknown> }
   _serialized<T>(signal: undefined, operation: () => Promise<T>): Promise<T>
@@ -75,6 +105,8 @@ interface Agent {
 interface AgentHandle { agent: Agent; dispose(): Promise<void> }
 interface Agents { get(id: string): Agent | undefined; list(): Agent[] }
 interface Journal { version: 1; id: string; directory: string; done: boolean }
+interface MoveJournal { version: 1; id: string; target: string; previous?: string; done: boolean }
+interface Ownership { active: boolean; movedClaim?: { original: string; target: string } }
 export interface SessionDeletion { deleteSession(id: string): Promise<void> }
 
 /** Refusals are stable across HTTP and the native adapter verification. */
@@ -91,8 +123,8 @@ export function hasLegacyDeletion(controller: object): boolean {
 }
 
 /** Install for a reviewed composition, including the old lifecycle decorator. */
-export function registerSessionDeletion(ctx: HostContext): () => SessionDeletion | undefined {
-  let available: SessionDeletion | undefined
+export function registerSessionDeletion(ctx: HostContext): () => JsonlDeletion | undefined {
+  let available: JsonlDeletion | undefined
   ctx.inject(['sessionPersistence', 'workspaceRegistry', 'sessionProjectionCache', 'sessionQuery', 'sessionController', 'agents', 'sessions'], scope => {
     const controller = scope.get('sessionController') as { deleteSession?: unknown; deleteArchivedSession?: unknown }
     if (!hasLegacyDeletion(controller)
@@ -133,13 +165,17 @@ export class JsonlDeletion implements SessionDeletion {
   private leaseClass?: LeaseClass
   private root = ''
   private records = ''
+  private movesDirectory?: string
+  private openWriter?: (id: string) => Promise<MoveHandle>
   private lockDirectory = ''
   private closing = false
   private tail: Promise<unknown> = Promise.resolve()
   private readonly pending = new Set<Promise<unknown>>()
-  private readonly deleting = new Set<string>()
+  private readonly mutating = new Set<string>()
+  private readonly moveRecords = new Map<string, MoveJournal>()
+  private readonly placements = new Map<string, string>()
   private readonly handles = new Map<string, AgentHandle>()
-  private readonly ownership = new AsyncLocalStorage<{ active: boolean }>()
+  private readonly ownership = new AsyncLocalStorage<Ownership>()
   private readonly restore: (() => void)[] = []
 
   constructor(private readonly ctx: HostContext) {
@@ -165,7 +201,8 @@ export class JsonlDeletion implements SessionDeletion {
     const profile = this.ctx.get('profileContext') as { installAnchor?: unknown } | undefined
     if (typeof profile?.installAnchor !== 'string') refuse('unsupported')
     const host = JSON.parse(await readFile(profile.installAnchor, 'utf8')) as { version?: string }
-    if (host.version !== '0.2.2-rc.3') refuse('unsupported')
+    const cleanRc4 = host.version === '0.2.2-rc.4' && !this.legacy
+    if (host.version !== '0.2.2-rc.3' && !cleanRc4) refuse('unsupported')
     await mkdir(this.persistence.root, { recursive: true })
     this.root = await realpath(this.persistence.root)
     const directory = join(this.root, '.session-bridge-deletion')
@@ -181,6 +218,7 @@ export class JsonlDeletion implements SessionDeletion {
     this.captureOwnership()
     // Recovery runs through the same locks and owner queues as a new request.
     await this.inLineage(async () => {
+      if (cleanRc4 && this.ctx.get('workingDirectory') !== undefined) await this.mountMovement(directory)
       for (const name of await readdir(this.records)) {
         if (!/^[a-f0-9]{64}\.json$/u.test(name)) continue
         const record = await this.readRecord(join(this.records, name))
@@ -193,33 +231,19 @@ export class JsonlDeletion implements SessionDeletion {
           }
         }
       }
+      for (const record of this.moveRecords.values()) {
+        if (record.done || await this.record(record.id)) continue
+        try { await this.completeMove(record.id, record.target) }
+        catch (error) { warn(this.ctx, `session-bridge: move pending for ${record.id}: ${String(error)}`) }
+      }
     })
   }
 
-  async deleteSession(id: string): Promise<void> {
-    if (this.closing || this.deleting.has(id)) refuse('busy')
-    this.deleting.add(id)
-    const operation = this.inLineage(async () => {
+  deleteSession(id: string): Promise<void> {
+    return this.mutate(id, 'delete', async () => {
       const existing = await this.record(id)
       if (existing !== undefined) { if (!existing.done) await this.complete(existing); return }
-      // Refuse queued/background work before releasing a controller-owned Agent.
-      const agent = this.agents.get(id)
-      if (agent !== undefined) {
-        if (agent.status === 'running' || agent.inbox.nextTurn.length || agent.inbox.nextStep.length) refuse('active')
-        if (this.handles.get(id)?.agent !== agent) refuse('owned')
-      }
-      const ctx = this.ctx as HostContext & {
-        waterfall(name: string, request: { sessionId: string }, fallback: () => Promise<unknown[]>): Promise<unknown[]>
-      }
-      if ((await ctx.waterfall('workspace/session-activity', { sessionId: id }, async () => [])).length) refuse('active')
-      await this.assertNoChildren(id)
-      if (agent !== undefined) {
-        if (agent.status === 'running' || agent.inbox.nextTurn.length || agent.inbox.nextStep.length) refuse('active')
-        await this.handles.get(id)!.dispose()
-        this.handles.delete(id)
-      }
-      const sessions = this.ctx.get('sessions') as { get(id: string): unknown }
-      if (this.agents.get(id) !== undefined || sessions.get(id) !== undefined) refuse('owned')
+      await this.releaseIdle(id, 'delete', () => this.assertNoChildren(id))
       this.persistence.tracker.claimWrite(id)
       let lease: Lease | undefined
       let lifecycle: Lease | undefined
@@ -233,9 +257,10 @@ export class JsonlDeletion implements SessionDeletion {
           await this.assertNoChildren(id)
         }
         lease = await this.persistence.acquireLease(id, undefined, directory)
+        await this.assertStoredIdle(id, 'delete')
         await this.artifacts(directory) // reject unfamiliar files before committing intent
         const record: Journal = { version: 1, id, directory: relative(this.root, directory), done: false }
-        await this.writeRecord(record)
+        await this.writeRecord(this.records, record)
         await this.cleanup(record, directory)
       } finally {
         try { await lease?.release() } finally {
@@ -243,8 +268,138 @@ export class JsonlDeletion implements SessionDeletion {
         }
       }
     })
+  }
+
+  get canMove(): boolean { return this.movesDirectory !== undefined }
+
+  moveSession(id: string, target: string): Promise<void> {
+    return this.mutate(id, 'move', async () => {
+      if (!this.canMove) throw new Error('session/move-unsupported')
+      if (await this.record(id)) throw new Error('session/move-not-found')
+      const workspace = this.workspace.get(target)
+      if (workspace === undefined) throw new Error('session/move-target-missing')
+      if (workspace.sessionIds.includes(id) && this.moveRecords.get(id)?.done !== false) return
+      await this.releaseIdle(id, 'move')
+      await this.completeMove(id, target)
+    })
+  }
+
+  private async mutate(id: string, kind: 'delete' | 'move', action: () => Promise<void>): Promise<void> {
+    if (this.closing || this.mutating.has(id)) throw new Error(`session/${kind}-busy`)
+    this.mutating.add(id)
+    const operation = this.inLineage(action)
     this.pending.add(operation)
-    try { await operation } finally { this.pending.delete(operation); this.deleting.delete(id) }
+    try { await operation } finally { this.pending.delete(operation); this.mutating.delete(id) }
+  }
+
+  /** Refuse queued or background work before releasing the API controller's writer. */
+  private async releaseIdle(id: string, kind: 'delete' | 'move', beforeRelease?: () => Promise<void>): Promise<void> {
+    const active = (agent: Agent): boolean => agent.status === 'running' || !!(agent.inbox.nextTurn.length || agent.inbox.nextStep.length)
+    const agent = this.agents.get(id)
+    const handle = this.handles.get(id)
+    const owned = () => new Error(kind === 'delete' ? 'session/delete-owned' : 'session/move-busy')
+    if (agent !== undefined) {
+      if (active(agent)) throw new Error(`session/${kind}-active`)
+      if (handle?.agent !== agent) throw owned()
+    }
+    const ctx = this.ctx as HostContext & {
+      waterfall(name: string, request: { sessionId: string }, fallback: () => Promise<unknown[]>): Promise<unknown[]>
+    }
+    if ((await ctx.waterfall('workspace/session-activity', { sessionId: id }, async () => [])).length) {
+      throw new Error(`session/${kind}-active`)
+    }
+    await beforeRelease?.()
+    if (agent !== undefined && this.agents.get(id) === agent && handle !== undefined) {
+      if (active(agent)) throw new Error(`session/${kind}-active`)
+      await handle.dispose()
+      this.handles.delete(id)
+    }
+    const sessions = this.ctx.get('sessions') as { get(id: string): unknown }
+    if (this.agents.get(id) !== undefined || sessions.get(id) !== undefined) throw owned()
+  }
+
+  private async mountMovement(directory: string): Promise<void> {
+    const controller = this.ctx.get('sessionController') as { agents?: object }
+    if (controller.agents === undefined
+      || digest(Object.getPrototypeOf(controller.agents).constructor.toString()) !== REVIEWED_PLACEMENT.controllerOwner) return
+    const moves = join(directory, 'moves')
+    await mkdir(moves, { recursive: true, mode: 0o700 })
+    if (!(await lstat(moves)).isDirectory()) refuse('unsupported')
+    await this.syncDirectory(directory)
+    for (const name of await readdir(moves)) {
+      if (!/^[a-f0-9]{64}\.json$/u.test(name)) continue
+      const path = join(moves, name)
+      if (!(await lstat(path)).isFile()) refuse('unsupported')
+      const record = JSON.parse(await readFile(path, 'utf8')) as Partial<MoveJournal>
+      if (record.version !== 1 || typeof record.id !== 'string' || digest(record.id) + '.json' !== name
+        || typeof record.target !== 'string' || typeof record.done !== 'boolean'
+        || (record.previous !== undefined && typeof record.previous !== 'string')) refuse('unsupported')
+      // A crash may have landed after attach but before the completion receipt.
+      const attached = this.workspace.requireTable().get(record.target)?.sessionIds.includes(record.id)
+      const placement = record.done || attached ? record.target : record.previous
+      if (placement !== undefined) this.placements.set(record.id, placement)
+      this.moveRecords.set(record.id, record as MoveJournal)
+    }
+    // Native workspace records anchor placement to immutable header.cwd. Only
+    // the registry sees the explicit binding; the stored header stays intact.
+    const host = this.workspace.host
+    this.wrap(host, 'candidateMatches', original => (id: string, path: string) => {
+      const placement = this.placements.get(id)
+      return placement === undefined ? Reflect.apply(original, host, [id, path]) : this.workspace.get(placement)?.path === path
+    }, REVIEWED_PLACEMENT.candidateMatches)
+    this.wrap(host, 'readSessionHeader', original => async (id: string) => {
+      const header = await Reflect.apply(original, host, [id]) as Header
+      const placement = this.placements.get(id)
+      const cwd = placement === undefined ? undefined : this.workspace.get(placement)?.path
+      return cwd === undefined ? header : { ...header, cwd }
+    }, REVIEWED_PLACEMENT.readSessionHeader)
+    this.movesDirectory = moves
+  }
+
+  private async completeMove(id: string, targetId: string): Promise<void> {
+    const handle = await this.openWriter!(id).catch(error => {
+      if (error instanceof Error && error.name === 'SessionPersistenceNotFoundError') throw new Error('session/move-not-found')
+      throw error
+    })
+    try {
+      await this.assertStoredIdle(id, 'move')
+      await this.workspace.enqueueOperation(async () => {
+        const target = this.workspace.get(targetId)
+        const valid = target && await realpath(target.path)
+          .then(async path => path === target.path && (await lstat(path)).isDirectory()).catch(() => false)
+        if (!target || !valid) throw new Error('session/move-target-missing')
+        const previous = this.placements.get(id)
+        const record: MoveJournal = { version: 1, id, target: targetId, previous, done: false }
+        try {
+          await this.writeRecord(this.movesDirectory!, record)
+          this.moveRecords.set(id, record)
+          const { events } = await handle.read()
+          const change = events.findLast(event => event.type === 'working-directory/change')
+          if ((change?.data?.cwd ?? handle.header.cwd) !== target.path) {
+            await handle.append([{ type: 'working-directory/change', seq: events.length, time: Date.now(), data: { cwd: target.path } }])
+            await handle.flush()
+          }
+          const source = this.workspace.list().find(entity => this.workspace.requireTable().get(entity.id)?.sessionIds.includes(id))
+          if (source?.id !== targetId) await source?.detachSession(id)
+          this.placements.set(id, targetId)
+          try { await target.attachSession(id) } catch (error) {
+            if (!this.workspace.requireTable().get(targetId)?.sessionIds.includes(id)) {
+              if (previous === undefined) this.placements.delete(id)
+              else this.placements.set(id, previous)
+              // Preserve the old sidebar row when target accounting fails. The
+              // durable intent lets a retry finish without duplicating events.
+              await source?.attachSession(id)
+            }
+            throw error
+          }
+          const completed = { ...record, done: true }
+          await this.writeRecord(this.movesDirectory!, completed)
+          this.moveRecords.set(id, completed)
+        } catch (error) {
+          throw new Error('session/move-cleanup-pending', { cause: error })
+        }
+      })
+    } finally { await handle.close() }
   }
 
   async dispose(): Promise<void> {
@@ -287,7 +442,6 @@ export class JsonlDeletion implements SessionDeletion {
     })
     const backend = this.persistence as Persistence & {
       create(header: Header, options?: unknown): Promise<Handle>
-      open(id: string, access: string, options?: unknown): Promise<Handle>
       listArtifacts(signal?: AbortSignal): Promise<{ header: Header }[]>
     }
     this.wrap(backend, 'listArtifacts', original => async function (this: Persistence, ...args: never[]) {
@@ -295,14 +449,20 @@ export class JsonlDeletion implements SessionDeletion {
       const kept = await Promise.all(rows.map(async row => await adapter.record(row.header.id) ? undefined : row))
       return kept.filter(row => row !== undefined)
     })
-    this.wrap(backend, 'open', original => async function (this: Persistence, id: string, ...args: never[]) {
-      if (adapter.deleting.has(id) || await adapter.record(id)) refuse('busy')
-      return Reflect.apply(original, this, [id, ...args])
+    this.wrap(backend, 'open', original => {
+      this.openWriter = id => Reflect.apply(original, backend, [id, 'write']) as Promise<MoveHandle>
+      return async function (this: Persistence, id: string, ...args: never[]) {
+        // Cold queue validation uses the Host's ordinary read-only observation
+        // under the acquired writer lease. Once intent is recorded, hide it.
+        if ((args[0] === 'write' && adapter.mutating.has(id)) || await adapter.record(id)) refuse('busy')
+        if (args[0] === 'write' && adapter.moveRecords.get(id)?.done === false) throw new Error('session/move-cleanup-pending')
+        return Reflect.apply(original, this, [id, ...args])
+      }
     })
     this.wrap(backend, 'create', original => function (this: Persistence, header: Header, ...args: never[]) {
       const receiver = this
       return adapter.inLineage(async () => {
-        if (adapter.closing || adapter.deleting.has(header.id) || await adapter.record(header.id)) refuse('busy')
+        if (adapter.closing || adapter.mutating.has(header.id) || await adapter.record(header.id)) refuse('busy')
         if (header.parentSession !== undefined && (await adapter.record(header.parentSession)
           || await adapter.persistence.stat(header.parentSession) === undefined)) refuse('not-found')
         const handle = await Reflect.apply(original, receiver, [header, ...args]) as Handle
@@ -337,10 +497,34 @@ export class JsonlDeletion implements SessionDeletion {
     if (controller.commands !== undefined) owners.push([controller.commands, 'fork'])
     for (const [owner, key] of owners) {
       this.wrap(owner as Record<string, unknown>, key, original => function (this: object, ...args: never[]) {
-        if ((key === 'resolve' || key === 'claim') && adapter.deleting.has(args[0]!)) refuse('busy')
-        const token = { active: true }
+        if ((key === 'resolve' || key === 'claim') && adapter.mutating.has(args[0]!)) refuse('busy')
+        const claim = adapter.ownership.getStore()
+        const movedClaim = claim?.active ? claim.movedClaim : undefined
+        if (key === 'createMinted' && movedClaim && movedClaim.original === args[0]) {
+          // The native claim may decline reuse. Its fresh Session must still
+          // be created in the requested target, not at the old header path.
+          return Reflect.apply(original, this, [movedClaim.target, ...args.slice(1)])
+        }
+        const token: Ownership = { active: true }
         return adapter.ownership.run(token, async () => {
-          try { return await Reflect.apply(original, this, args) } finally { token.active = false }
+          try {
+            if (key === 'claim' && adapter.canMove) {
+              const id: string = args[0]!
+              const request = args[1]! as { cwd: string }
+              const record = adapter.moveRecords.get(id)
+              const workspace = record?.done ? adapter.workspace.get(record.target) : undefined
+              if (workspace?.path === request.cwd && workspace.sessionIds.includes(id)) {
+                const header = adapter.agents.get(id)?.session.header ?? (await adapter.persistence.stat(id))?.header
+                if (header?.cwd !== undefined && header.cwd !== request.cwd) {
+                  // Restoring an existing blank Session checks immutable cwd.
+                  // Only a matching, durable target membership authorizes reuse.
+                  token.movedClaim = { original: header.cwd, target: request.cwd }
+                  return await Reflect.apply(original, this, [id, { ...request, cwd: header.cwd }])
+                }
+              }
+            }
+            return await Reflect.apply(original, this, args)
+          } finally { token.active = false }
         })
       }, this.legacy && key !== 'fork' ? LEGACY.owner : undefined)
     }
@@ -392,12 +576,12 @@ export class JsonlDeletion implements SessionDeletion {
     return value as Journal
   }
 
-  private async writeRecord(record: Journal): Promise<void> {
-    const path = join(this.records, digest(record.id) + '.json')
+  private async writeRecord(directory: string, record: Journal | MoveJournal): Promise<void> {
+    const path = join(directory, digest(record.id) + '.json')
     const temporary = `${path}.${randomUUID()}.tmp`
     const file = await open(temporary, 'wx', 0o600)
     try { await file.writeFile(JSON.stringify(record)); await file.sync() } finally { await file.close() }
-    try { await rename(temporary, path); await this.syncDirectory(this.records) }
+    try { await rename(temporary, path); await this.syncDirectory(directory) }
     finally { await unlink(temporary).catch(error => { if (!missing(error)) throw error }) }
   }
 
@@ -476,7 +660,13 @@ export class JsonlDeletion implements SessionDeletion {
         await this.query._ensureReady()
         await this.query._reconcile()
       })
-      await this.writeRecord({ ...record, done: true })
+      if (this.movesDirectory !== undefined && this.moveRecords.has(record.id)) {
+        await unlink(join(this.movesDirectory, digest(record.id) + '.json')).catch(error => { if (!missing(error)) throw error })
+        await this.syncDirectory(this.movesDirectory)
+        this.moveRecords.delete(record.id)
+        this.placements.delete(record.id)
+      }
+      await this.writeRecord(this.records, { ...record, done: true })
     } catch (error) {
       throw new Error('session/delete-cleanup-pending', { cause: error })
     }
@@ -485,6 +675,19 @@ export class JsonlDeletion implements SessionDeletion {
   private async assertNoChildren(id: string): Promise<void> {
     if ((await this.persistence.list()).some(row => row.header.parentSession === id)
       || this.agents.list().some(item => item.session.header.parentSession === id)) refuse('has-children')
+  }
+
+  /** The Host can retain a queue after its Agent goes cold. Never wake it here. */
+  private async assertStoredIdle(id: string, kind: 'delete' | 'move'): Promise<void> {
+    const observation = await this.query.observeSession(id)
+    try {
+      const inbox = observation.projections?.values.inbox
+      if (inbox) {
+        if (inbox['next-turn'].length || inbox['next-step'].length) throw new Error(`session/${kind}-active`)
+      } else if (observation.events.some(event => event.type === 'agent/inbox/spliced')) {
+        throw new Error(`session/${kind}-unsupported`)
+      }
+    } finally { observation[Symbol.dispose]() }
   }
 
   private forgetHeader(id: string): void {

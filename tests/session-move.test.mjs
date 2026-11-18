@@ -30,6 +30,7 @@ it('accepts exactly a confirmed Session and Workspace identity', () => {
 
 it('reports an unsupported Host and never moves through a guessed path', async () => {
   let route
+  let bundled
   const cleanups = []
   let unregistered = false
   const controller = {}
@@ -40,7 +41,7 @@ it('reports an unsupported Host and never moves through a guessed path', async (
     },
     effect(start) { cleanups.push(start()) },
   }
-  registerSessionMoveRoute(ctx)
+  registerSessionMoveRoute(ctx, () => bundled)
   const capability = () => route.fetch(new Request('http://localhost' + route.path)).then(response => response.json())
   assert.deepEqual(await capability(), { supported: false, reason: 'session/move-unsupported' })
   const send = value => route.fetch(new Request('http://localhost' + route.path, {
@@ -53,6 +54,12 @@ it('reports an unsupported Host and never moves through a guessed path', async (
   controller.moveSession = true
   assert.deepEqual(await capability(), { supported: false, reason: 'session/move-unsupported' })
   const moves = []
+  bundled = { canMove: false, async moveSession() { assert.fail('unready move adapter called') } }
+  assert.equal((await send({ sessionId: 'one', targetWorkspaceId: 'two', confirmed: true })).status, 501)
+  bundled = { canMove: true, async moveSession(...args) { moves.push(['plugin', ...args]) } }
+  assert.deepEqual(await capability(), { supported: true, backend: 'bridge-jsonl' })
+  assert.equal((await send({ sessionId: 'one', targetWorkspaceId: 'two', confirmed: true })).status, 200)
+  assert.deepEqual(moves.splice(0), [['plugin', 'one', 'two']])
   controller.moveSession = async (sessionId, targetWorkspaceId) => { moves.push([sessionId, targetWorkspaceId]) }
   assert.deepEqual(await capability(), { supported: true, backend: 'host' })
   assert.deepEqual(moves, [], 'capability lookup must never move a session')

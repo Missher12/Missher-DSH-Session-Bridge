@@ -1,50 +1,14 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.7",
-  "candidateStatus": "1.0.7: reviewed deletion takes precedence over the known unsafe lifecycle 0.1.0 on DSH 0.2.2-rc.3.",
+  "packageVersion": "1.0.8",
+  "candidateStatus": "1.0.8 candidate for clean official DSH 0.2.2-rc.4 and the reviewed rc.3 compositions.",
   "hardHostVersionGate": false,
-  "change": "Fix queued/background activity refusals and workspace cleanup failure reporting in the daily legacy composition; preserve native menu groups, icons and drag movement.",
+  "change": "Enable bundled deletion and durable workspace movement on clean 0.2.2-rc.4. Inspect stored inboxes before mutations and preserve moved blank Sessions on native restore.",
   "currentChecks": {
-    "check": "pnpm run check: strict Host/client types, both builds, client Loader check and offline tests.",
-    "offlineTests": {
-      "passed": 73,
-      "failed": 0,
-      "skipped": 15,
-      "cancelled": 0,
-      "concurrency": 1
-    },
-    "skips": "12 pre-existing chip tests and 3 scratch picker tests need optional full React/JSDOM SDK setup; the separate menu DOM check uses real Host React and primitives.",
-    "host": "Original installed DSH 0.2.2-rc.3 modules under the original Electron/Node runtime, macOS x64.",
-    "nativeComponents": [
-      "plain JSONL",
-      "zstd",
-      "normal deletion",
-      "archive and pin cleanup",
-      "durable workspace membership",
-      "workspace file preservation",
-      "native writer-lock inode preservation",
-      "foreign-process writer refusal",
-      "parent/child races",
-      "running, queued and unmanaged owner refusal",
-      "all stored generations",
-      "SQLite and unopened persistent SQLite",
-      "projection cache and late writebacks",
-      "interrupted cleanup replay",
-      "unload",
-      "legacy lifecycle wrappers",
-      "next-turn and next-step queues before disposal",
-      "background activity before disposal",
-      "legacy move override cleanup",
-      "legacy native lineage lock",
-      "cleanup-pending HTTP retry after failed startup replay"
-    ],
-    "isolatedInstall": "Isolated desktop profile with the same legacy 0.1.0 persistence/workspace/lifecycle code and original rc.3 Host; install the candidate tgz through pluginManager, exercise the menu HTTP delete route, verify idle controller ownership and cleanup-pending retry. No daily Session deletions or model calls.",
-    "nativeClicks": "Not tested. Full Host/profile HTTP acceptance is distinct from native window clicking.",
-    "untestedPlatforms": [
-      "Windows",
-      "Linux"
-    ],
-    "realModelCalls": "Not required or made."
+    "host": "Official npm @deepseek-ai/dsh@0.2.2-rc.4, isolated localhost web profile on macOS Intel. rc.3 legacy runtime component regression uses the original Electron/Node runtime in a synthetic root.",
+    "check": "pnpm run check for Host and client types, build, Loader contract and offline tests.",
+    "fixtureProvider": "Keyless deterministic local model; no external model calls.",
+    "nativeElectron": "Official rc.4 native window and other platforms not tested by the web-profile acceptance."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -250,7 +214,6 @@
   },
   "previousDailyInstalledVersion": "1.0.0",
   "deletionCompanion": {
-    "reviewedHostVersion": "0.2.2-rc.3",
     "serviceImplementationChecks": true,
     "nativeDeletePreferred": false,
     "unknownComposition": "unsupported; other Bridge functions retain their capability checks",
@@ -259,7 +222,11 @@
     "recovery": "Durable deletion intent is replayed when the companion starts; incomplete cleanup never returns success.",
     "legacyComposition": "Reviewed 0.1.0 JSONL/workspace pair on rc.3; preserve lifecycle component and move API but bypass its unsafe deletion methods.",
     "externalLegacyEndpoints": "Unchanged and outside this fix; do not infer safety for direct legacy controller deletion calls.",
-    "officialRc4": "Unsupported deletion/move; exact rc.3 version check retained."
+    "reviewedHostVersions": [
+      "0.2.2-rc.3",
+      "0.2.2-rc.4"
+    ],
+    "olderOfficialRc4": "0.2.1-rc.4 remains unsupported for deletion and workspace moves."
   },
   "previousMenuChecks_1_0_5": {
     "check": "pnpm run check passed: strict Host/client types, both builds, client Loader check and offline tests.",
@@ -275,5 +242,52 @@
     "host": "DSH 0.2.2-rc.3 native registry, workspace contributions, renderer and primitives; controlled session stores and transport.",
     "nativeAcceptance": "Native Electron inspection was unavailable because the computer-use app connection timed out; no native-click or pixel-layout claim."
   },
-  "previousIsolatedInstall_1_0_6": "Fresh desktop profile; official base and web bundles; only Session Bridge added through pluginManager.installBundle; no legacy sb-host patches. Authenticated HTTP deletes idle API-owned ordinary and archived Sessions; list and durable metadata checked."
+  "previousIsolatedInstall_1_0_6": "Fresh desktop profile; official base and web bundles; only Session Bridge added through pluginManager.installBundle; no legacy sb-host patches. Authenticated HTTP deletes idle API-owned ordinary and archived Sessions; list and durable metadata checked.",
+  "previousChecks_1_0_7": {
+    "check": "pnpm run check: strict Host/client types, both builds, client Loader check and offline tests.",
+    "offlineTests": {
+      "passed": 73,
+      "failed": 0,
+      "skipped": 15,
+      "cancelled": 0,
+      "concurrency": 1
+    },
+    "skips": "12 pre-existing chip tests and 3 scratch picker tests need optional full React/JSDOM SDK setup; the separate menu DOM check uses real Host React and primitives.",
+    "host": "Original installed DSH 0.2.2-rc.3 modules under the original Electron/Node runtime, macOS x64.",
+    "nativeComponents": [
+      "plain JSONL",
+      "zstd",
+      "normal deletion",
+      "archive and pin cleanup",
+      "durable workspace membership",
+      "workspace file preservation",
+      "native writer-lock inode preservation",
+      "foreign-process writer refusal",
+      "parent/child races",
+      "running, queued and unmanaged owner refusal",
+      "all stored generations",
+      "SQLite and unopened persistent SQLite",
+      "projection cache and late writebacks",
+      "interrupted cleanup replay",
+      "unload",
+      "legacy lifecycle wrappers",
+      "next-turn and next-step queues before disposal",
+      "background activity before disposal",
+      "legacy move override cleanup",
+      "legacy native lineage lock",
+      "cleanup-pending HTTP retry after failed startup replay"
+    ],
+    "isolatedInstall": "Isolated desktop profile with the same legacy 0.1.0 persistence/workspace/lifecycle code and original rc.3 Host; install the candidate tgz through pluginManager, exercise the menu HTTP delete route, verify idle controller ownership and cleanup-pending retry. No daily Session deletions or model calls.",
+    "nativeClicks": "Not tested. Full Host/profile HTTP acceptance is distinct from native window clicking.",
+    "untestedPlatforms": [
+      "Windows",
+      "Linux"
+    ],
+    "realModelCalls": "Not required or made."
+  },
+  "movementCompanion": {
+    "reviewedHostVersion": "0.2.2-rc.4",
+    "requiresEnabledBridgeForGrouping": true,
+    "recovery": "Native writer lease and workspace owner. Durable placement intent is replayable and never overwrites original header or history."
+  }
 }

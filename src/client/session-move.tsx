@@ -33,6 +33,7 @@ function moveErrorKey(code: string | undefined): SessionBridgeKey {
     'session/move-unsupported': 'move.unsupported',
     'session/move-active': 'move.active',
     'session/move-busy': 'move.busy',
+    'session/move-cleanup-pending': 'move.cleanupPending',
     'session/move-same-workspace': 'move.same',
     'session/move-target-missing': 'move.targetMissing',
     'session/move-not-found': 'move.failed',
