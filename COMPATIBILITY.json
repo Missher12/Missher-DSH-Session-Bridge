@@ -1,14 +1,13 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.9",
-  "candidateStatus": "1.0.9 restores permanent deletion on the reviewed DSH 0.2.2-rc.4 configuration with legacy 0.1.0 session components.",
+  "packageVersion": "1.0.10",
+  "candidateStatus": "1.0.10 adds official DSH 0.2.2-rc.5 to the reviewed lifecycle compositions.",
   "hardHostVersionGate": false,
-  "change": "Admit the reviewed legacy JSONL persistence and workspace services on DSH 0.2.2-rc.4. The existing deletion transaction retains its locks and safety checks.",
+  "change": "Admit the exact rc.5 release after verifying the relevant owner implementations match rc.4. Keep existing writer, lineage, journal and index safeguards.",
   "currentChecks": {
-    "host": "On macOS Intel, check-session-deletion-host.mjs passed with compressed logs on the official 0.2.2-rc.4 services and on the same version using the legacy 0.1.0 persistence, workspace and lifecycle components.",
-    "check": "Host type checking, Host build, offline tests and tarball boundary verification.",
-    "fixtureProvider": "Keyless deterministic local model; no external model calls.",
-    "nativeElectron": "The host check exercises the deletion route with synthetic data. It does not cover native Electron menu clicks or other platforms."
+    "host": "Official npm @deepseek-ai/dsh@0.2.2-rc.5 on macOS Intel, isolated Web profile with synthetic Sessions and only Session Bridge added.",
+    "baseline": "Published 1.0.9 returned HTTP 501 for deletion and movement on this clean Host.",
+    "scope": "Native menu via Chromium, authenticated lifecycle routes, cold restart and SQLite search; native Electron and other platforms are outside this check."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",
@@ -224,7 +223,8 @@
     "externalLegacyEndpoints": "Unchanged and outside this fix; do not infer safety for direct legacy controller deletion calls.",
     "reviewedHostVersions": [
       "0.2.2-rc.3",
-      "0.2.2-rc.4"
+      "0.2.2-rc.4",
+      "0.2.2-rc.5"
     ],
     "olderOfficialRc4": "0.2.1-rc.4 remains unsupported for deletion and workspace moves."
   },
@@ -286,8 +286,17 @@
     "realModelCalls": "Not required or made."
   },
   "movementCompanion": {
-    "reviewedHostVersion": "0.2.2-rc.4",
     "requiresEnabledBridgeForGrouping": true,
-    "recovery": "Native writer lease and workspace owner. Durable placement intent is replayable and never overwrites original header or history."
+    "recovery": "Native writer lease and workspace owner. Durable placement intent is replayable and never overwrites original header or history.",
+    "reviewedHostVersions": [
+      "0.2.2-rc.4",
+      "0.2.2-rc.5"
+    ]
+  },
+  "previousChecks_1_0_9": {
+    "host": "On macOS Intel, check-session-deletion-host.mjs passed with compressed logs on the official 0.2.2-rc.4 services and on the same version using the legacy 0.1.0 persistence, workspace and lifecycle components.",
+    "check": "Host type checking, Host build, offline tests and tarball boundary verification.",
+    "fixtureProvider": "Keyless deterministic local model; no external model calls.",
+    "nativeElectron": "The host check exercises the deletion route with synthetic data. It does not cover native Electron menu clicks or other platforms."
   }
 }

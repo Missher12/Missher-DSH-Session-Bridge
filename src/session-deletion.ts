@@ -201,8 +201,8 @@ export class JsonlDeletion implements SessionDeletion {
     const profile = this.ctx.get('profileContext') as { installAnchor?: unknown } | undefined
     if (typeof profile?.installAnchor !== 'string') refuse('unsupported')
     const host = JSON.parse(await readFile(profile.installAnchor, 'utf8')) as { version?: string }
-    const rc4 = host.version === '0.2.2-rc.4'
-    if (host.version !== '0.2.2-rc.3' && !rc4) refuse('unsupported')
+    const bundledMoveHost = host.version === '0.2.2-rc.4' || host.version === '0.2.2-rc.5'
+    if (host.version !== '0.2.2-rc.3' && !bundledMoveHost) refuse('unsupported')
     await mkdir(this.persistence.root, { recursive: true })
     this.root = await realpath(this.persistence.root)
     const directory = join(this.root, '.session-bridge-deletion')
@@ -218,7 +218,7 @@ export class JsonlDeletion implements SessionDeletion {
     this.captureOwnership()
     // Recovery runs through the same locks and owner queues as a new request.
     await this.inLineage(async () => {
-      if (rc4 && !this.legacy && this.ctx.get('workingDirectory') !== undefined) await this.mountMovement(directory)
+      if (bundledMoveHost && !this.legacy && this.ctx.get('workingDirectory') !== undefined) await this.mountMovement(directory)
       for (const name of await readdir(this.records)) {
         if (!/^[a-f0-9]{64}\.json$/u.test(name)) continue
         const record = await this.readRecord(join(this.records, name))

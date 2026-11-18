@@ -6,7 +6,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- `@missher/dsh-session-bridge` **1.0.9** restores permanent deletion on DSH 0.2.2-rc.4 profiles that kept the legacy session components.
+- `@missher/dsh-session-bridge` **1.0.10** supports bundled deletion and workspace drag on official DSH 0.2.2-rc.5.
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -17,11 +17,11 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 ## Safe deletion and workspace moves
 
-Bridge provides permanent deletion on the reviewed 0.2.2-rc.3 and 0.2.2-rc.4 JSONL configurations, including those using the legacy 0.1.0 session components. It uses native writer leases and checks lineage, running or background activity, queued input on live and cold Sessions, and foreign writer ownership before removal.
+Bridge provides permanent deletion on the reviewed 0.2.2-rc.3, rc.4, and rc.5 JSONL configurations, including those using the legacy 0.1.0 session components. It uses native writer leases and checks lineage, running or background activity, queued input on live and cold Sessions, and foreign writer ownership before removal.
 
 A durable intent precedes removal of plain/compressed logs and retained generations. Workspace, archive, pin, projection-cache and SQLite cleanup runs through the respective owners. Interrupted cleanup is replayed on plugin startup; failures return cleanup-pending and retain an explicit retry path, never full success. Legacy move overrides are also removed through their owner; native lineage locks and tombstones remain in place. Minimal deletion markers and the stable lock file remain; workspace files are preserved. Keep the plugin installed while cleanup is pending. Other programs writing the same store must follow the same transaction contract.
 
-Clean 0.2.2-rc.4 also supports workspace drag. The move appends a working-directory event using the Host writer, then updates workspace membership through the workspace owner. The original identity, title, history, archive and pin state are preserved. An interrupted move can resume after another drag or plugin reload. Bridge maintains the explicit placement for these moves and must be enabled for grouping.
+Clean 0.2.2-rc.4 and rc.5 support workspace drag. The move appends a working-directory event using the Host writer, then updates workspace membership through the workspace owner. The original identity, title, history, archive and pin state are preserved. An interrupted move can resume after another drag or plugin reload. Bridge maintains the explicit placement for these moves and must be enabled for grouping.
 
 The adapter only runs on reviewed implementations. The rc.3 legacy move API remains available in existing deployments. External calls to the legacy deletion methods remain outside the plugin’s protection. The older official 0.2.1-rc.4 lacks these deletion and move capabilities.
 
@@ -34,7 +34,7 @@ In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.9/missher-dsh-session-bridge-1.0.9.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.10/missher-dsh-session-bridge-1.0.10.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
@@ -84,7 +84,7 @@ Targets accept an exact ID, case-insensitive exact title or unique ID prefix. Am
 
 Cleanup selects registered workspaces under the canonical `scratchRoot` whose directory names start with `dsh-` and have no nonblank sessions, always excluding the fixed `dsh-scratch` workspace. It does not check a plugin-created marker or the current `scratchPrefix`: other matching `dsh-*` workspaces can qualify, while custom prefixes not starting with `dsh-` do not. Files saved in selected directories are also deleted. Review the preview and preserve anything you need first.
 
-On DSH 0.2.2-rc.3 and 0.2.2-rc.4, native actions, copied information, archive and deletion form separate menu groups with native icons. The Host owns the single Copy Session ID entry. Older Hosts retain the legacy menu contributions.
+On the reviewed DSH 0.2.2-rc.3, rc.4, and rc.5 configurations, native actions, copied information, archive and deletion form separate menu groups with native icons. The Host owns the single Copy Session ID entry. Older Hosts retain the legacy menu contributions.
 
 ## Host and platform boundaries
 

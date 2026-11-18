@@ -6,7 +6,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名 `@missher/dsh-session-bridge`。**1.0.9** 恢复了保留旧会话组件的 DSH 0.2.2-rc.4 上的永久删除。
+- 包名 `@missher/dsh-session-bridge`。**1.0.10** 在官方 DSH 0.2.2-rc.5 上可直接使用安全删除与拖放移动。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -16,20 +16,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.9，下载 `missher-dsh-session-bridge-1.0.9.tgz` 与 `SHA256SUMS`。版本与文件是否可下载以该页面为准。运行包包含编译结果，请用该安装包安装插件。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.10，下载 `missher-dsh-session-bridge-1.0.10.tgz` 与 `SHA256SUMS`。版本与文件是否可下载以该页面为准。运行包包含编译结果，请用该安装包安装插件。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.9/missher-dsh-session-bridge-1.0.9.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.10/missher-dsh-session-bridge-1.0.10.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.9.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.10.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -40,9 +40,9 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.9.
 
 在左侧目标会话行打开三点菜单。当前 DSH 显示“复制 Session ID”，缺少原生入口的宿主由插件提供“复制会话 ID”。两者都保留完整的 `session-` 前缀。菜单还可复制当前工作目录或 `/bridge <session-id> ` 引用。
 
-在 DSH 0.2.2-rc.3 与 0.2.2-rc.4 的统一菜单中，常用操作、复制信息、归档和删除以轻分隔线分组，所有操作使用宿主图标；复制 ID 只显示宿主的一项。旧版宿主继续使用原有菜单入口。
+在已核对的 DSH 0.2.2-rc.3、rc.4 与 rc.5 的统一菜单中，常用操作、复制信息、归档和删除以轻分隔线分组，所有操作使用宿主图标；复制 ID 只显示宿主的一项。旧版宿主继续使用原有菜单入口。
 
-操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。删除前会二次确认，工作区文件保留。拖放保留原会话 ID、标题和历史，并更新所在工作区与后续工作目录。1.0.8 支持已核对的干净 0.2.2-rc.4 JSONL 组成，只需安装 Session Bridge。0.2.2-rc.3 日常环境的安全删除与旧组件的移动接口继续可用。
+操作读取被点击的会话，包括归档行，不切换当前会话；目录未加载或复制失败会给出提示。删除入口对普通会话和归档会话都显示；拖放移动作用于侧栏会话行与工作区行。删除前会二次确认，工作区文件保留。拖放保留原会话 ID、标题和历史，并更新所在工作区与后续工作目录。干净的 DSH 0.2.2-rc.4 与 rc.5 只需安装 Session Bridge。0.2.2-rc.3 日常环境的安全删除与旧组件的移动接口继续可用。
 
 ### 「不在工作区」与 scratch
 
@@ -79,11 +79,11 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.9.
 
 ## Host 与平台边界
 
-永久删除复用宿主写入锁，协调派生会话创建与父会话删除。运行中、后台活动、在线或冷会话有排队输入、其他所有者占用或仍有派生会话时拒绝操作。包内事务支持已核对的 DSH 0.2.2-rc.3 和 0.2.2-rc.4 组合，包括原生 JSONL 和保留旧 0.1.0 会话组件的配置。
+永久删除复用宿主写入锁，协调派生会话创建与父会话删除。运行中、后台活动、在线或冷会话有排队输入、其他所有者占用或仍有派生会话时拒绝操作。包内事务支持已核对的 DSH 0.2.2-rc.3、rc.4 和 rc.5 组合，包括原生 JSONL 和保留旧 0.1.0 会话组件的配置。
 
 删除意图先持久化，之后清除普通/压缩日志及历史代文件，并经各自所有者清理工作区、归档、置顶和索引。中断后由同一插件重放未完成清理；清理失败明确返回“清理待完成”，保留删除意图并支持重试，不会报告成功。旧组件组合同时清除移动归属覆盖，并保留其原生派生关系锁与删除标记。保留最小删除标记和原生锁文件，避免会话 ID 被重新使用，工作区中的用户文件不删除。不要在清理未完成时移除插件；其他直接写存储的程序也必须遵循相同事务约定。
 
-**干净 0.2.2-rc.4 的移动**用宿主写入句柄追加工作目录事件，并通过原生工作区操作迁移归属。归档、置顶与已写入的消息历史保留。中断可重新拖放重试或在下次加载时恢复。该版本的移动归属由 Bridge 持久化维护，需要启用插件才能恢复分组。
+**干净 0.2.2-rc.4 与 rc.5 的移动**用宿主写入句柄追加工作目录事件，并通过原生工作区操作迁移归属。归档、置顶与已写入的消息历史保留。中断可重新拖放重试或在下次加载时恢复。该版本的移动归属由 Bridge 持久化维护，需要启用插件才能恢复分组。
 
 适配器只接受已核对的服务实现。日常 rc.3 的旧组件外部直删入口仍在本插件的保护范围之外。较早的官方 **0.2.1-rc.4** 仍缺少安全删除和移动能力。
 
@@ -126,7 +126,7 @@ Bridge 整体没有宿主版本号硬限制；包内删除适配另外核对服�
 
 删除不可撤销。需要保留记录时，应先正常退出所有使用该数据目录的进程，备份完整 profile 与其实际配置的持久化存储；恢复时也先正常退出，并整体恢复同一份快照，不能只补回单个日志文件。
 
-旧版依赖可选的 Host 生命周期接口：`sessionController.deleteSession`（优先）或 `deleteArchivedSession`（旧宿主），以及 `sessionController.moveSession`。已核对的 0.2.2-rc.3 和 0.2.2-rc.4 支持上文的包内事务。其他宿主仍按各自提供的能力显示操作。旧的独立宿主补丁记录见 [host-lifecycle-patch-20261031.md](docs/compatibility/host-lifecycle-patch-20261031.md)。
+旧版依赖可选的 Host 生命周期接口：`sessionController.deleteSession`（优先）或 `deleteArchivedSession`（旧宿主），以及 `sessionController.moveSession`。已核对的 0.2.2-rc.3 至 rc.5 支持上文的包内删除事务。其他宿主仍按各自提供的能力显示操作。旧的独立宿主补丁记录见 [host-lifecycle-patch-20261031.md](docs/compatibility/host-lifecycle-patch-20261031.md)。
 
 验证层次见 `COMPATIBILITY.json`。0.1.3在 Linux 隔离构建，59 条离线测试全通过（0 失败 0 跳过，worker 1）；其中 12 条 chip/浮层测试是 React + JSDOM 的受控几何行为检查，不等于像素或浏览器布局证据。`check-host-contracts` 通过的是共享 Host **source SDK 声明**，当时核查的社区安装包未提供对应 `.d.ts`；官方 rc.4 npm 包已有声明。样式所有权与 peer reload/self reload/unload 在真实安装的 alpha.2 模块系统 + Cordis Loader 上通过；历史上“无主 style 被 claim”的负对照在新版不再复现（owner 为 null），旧故障复现说法不适用于本版。归档删除的确认/取消/删除为 rc.2 真实点击、仅合成记录，工作区文件与其他会话保留、重启后删除仍持久。原生 Electron 点击、真实模型调用、其他官方版本与其他平台未验收。
 
