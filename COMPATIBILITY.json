@@ -1,14 +1,14 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.8",
-  "candidateStatus": "1.0.8 candidate for clean official DSH 0.2.2-rc.4 and the reviewed rc.3 compositions.",
+  "packageVersion": "1.0.9",
+  "candidateStatus": "1.0.9 restores permanent deletion on the reviewed DSH 0.2.2-rc.4 configuration with legacy 0.1.0 session components.",
   "hardHostVersionGate": false,
-  "change": "Enable bundled deletion and durable workspace movement on clean 0.2.2-rc.4. Inspect stored inboxes before mutations and preserve moved blank Sessions on native restore.",
+  "change": "Admit the reviewed legacy JSONL persistence and workspace services on DSH 0.2.2-rc.4. The existing deletion transaction retains its locks and safety checks.",
   "currentChecks": {
-    "host": "Official npm @deepseek-ai/dsh@0.2.2-rc.4, isolated localhost web profile on macOS Intel. rc.3 legacy runtime component regression uses the original Electron/Node runtime in a synthetic root.",
-    "check": "pnpm run check for Host and client types, build, Loader contract and offline tests.",
+    "host": "On macOS Intel, check-session-deletion-host.mjs passed with compressed logs on the official 0.2.2-rc.4 services and on the same version using the legacy 0.1.0 persistence, workspace and lifecycle components.",
+    "check": "Host type checking, Host build, offline tests and tarball boundary verification.",
     "fixtureProvider": "Keyless deterministic local model; no external model calls.",
-    "nativeElectron": "Official rc.4 native window and other platforms not tested by the web-profile acceptance."
+    "nativeElectron": "The host check exercises the deletion route with synthetic data. It does not cover native Electron menu clicks or other platforms."
   },
   "historicalEvidence": {
     "package": "@missher/dsh-session-bridge",

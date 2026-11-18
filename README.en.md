@@ -6,7 +6,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- Package: `@missher/dsh-session-bridge`; version: **1.0.8** (bundled deletion and workspace drag on clean DSH 0.2.2-rc.4).
+- `@missher/dsh-session-bridge` **1.0.9** restores permanent deletion on DSH 0.2.2-rc.4 profiles that kept the legacy session components.
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -17,7 +17,7 @@ Display and copy complete session IDs, list/read/message other sessions, and cre
 
 ## Safe deletion and workspace moves
 
-On the reviewed 0.2.2-rc.3 JSONL compositions and clean 0.2.2-rc.4, Bridge provides permanent deletion. It uses native writer leases and checks lineage, running or background activity, queued input on live and cold Sessions, and foreign writer ownership before removal.
+Bridge provides permanent deletion on the reviewed 0.2.2-rc.3 and 0.2.2-rc.4 JSONL configurations, including those using the legacy 0.1.0 session components. It uses native writer leases and checks lineage, running or background activity, queued input on live and cold Sessions, and foreign writer ownership before removal.
 
 A durable intent precedes removal of plain/compressed logs and retained generations. Workspace, archive, pin, projection-cache and SQLite cleanup runs through the respective owners. Interrupted cleanup is replayed on plugin startup; failures return cleanup-pending and retain an explicit retry path, never full success. Legacy move overrides are also removed through their owner; native lineage locks and tombstones remain in place. Minimal deletion markers and the stable lock file remain; workspace files are preserved. Keep the plugin installed while cleanup is pending. Other programs writing the same store must follow the same transaction contract.
 
@@ -34,7 +34,7 @@ In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.8/missher-dsh-session-bridge-1.0.8.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.9/missher-dsh-session-bridge-1.0.9.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.

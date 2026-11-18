@@ -6,7 +6,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名：`@missher/dsh-session-bridge`；版本：**1.0.8**（干净的 DSH 0.2.2-rc.4 可直接删除和拖放移动；保留菜单分组与图标）。
+- 包名 `@missher/dsh-session-bridge`。**1.0.9** 恢复了保留旧会话组件的 DSH 0.2.2-rc.4 上的永久删除。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -16,20 +16,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.8，下载 `missher-dsh-session-bridge-1.0.8.tgz` 与 `SHA256SUMS`；版本与文件是否可下载以该页面为准。运行包包含编译结果，不要将 GitHub 自动生成的源码压缩包当作插件安装包。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.9，下载 `missher-dsh-session-bridge-1.0.9.tgz` 与 `SHA256SUMS`。版本与文件是否可下载以该页面为准。运行包包含编译结果，请用该安装包安装插件。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.8/missher-dsh-session-bridge-1.0.8.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.9/missher-dsh-session-bridge-1.0.9.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.8.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.9.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -79,7 +79,7 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.8.
 
 ## Host 与平台边界
 
-**1.0.8 的删除**复用宿主写入锁，协调派生会话创建与父会话删除。运行中、后台活动、在线或冷会话有排队输入、其他所有者占用或仍有派生会话时拒绝操作。包内事务支持已核对的 0.2.2-rc.3 原始 JSONL 与旧 0.1.0 组件组合，以及干净的 0.2.2-rc.4 JSONL。
+永久删除复用宿主写入锁，协调派生会话创建与父会话删除。运行中、后台活动、在线或冷会话有排队输入、其他所有者占用或仍有派生会话时拒绝操作。包内事务支持已核对的 DSH 0.2.2-rc.3 和 0.2.2-rc.4 组合，包括原生 JSONL 和保留旧 0.1.0 会话组件的配置。
 
 删除意图先持久化，之后清除普通/压缩日志及历史代文件，并经各自所有者清理工作区、归档、置顶和索引。中断后由同一插件重放未完成清理；清理失败明确返回“清理待完成”，保留删除意图并支持重试，不会报告成功。旧组件组合同时清除移动归属覆盖，并保留其原生派生关系锁与删除标记。保留最小删除标记和原生锁文件，避免会话 ID 被重新使用，工作区中的用户文件不删除。不要在清理未完成时移除插件；其他直接写存储的程序也必须遵循相同事务约定。
 
