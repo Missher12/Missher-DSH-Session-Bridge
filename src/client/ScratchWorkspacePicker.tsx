@@ -132,6 +132,7 @@ export function ScratchWorkspacePicker({
 }: ScratchWorkspacePickerProps): ReactNode {
   const snapshot = useWorkspaces(state => state)
   const workspaces = snapshot.items
+  const scratchTitle = text(t, 'picker.scratchTitle')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scratchWorkspaceId, setScratchWorkspaceId] = useState<string | null>(null)
@@ -195,7 +196,7 @@ export function ScratchWorkspacePicker({
     setBusy(true)
     void (async () => {
       try {
-        const { workspaceId } = await startScratchSession(text(t, 'picker.scratchTitle'))
+        const { workspaceId } = await startScratchSession(scratchTitle)
         setScratchWorkspaceId(workspaceId)
         onPick(workspaceId)
       } catch (reason: unknown) {
@@ -249,7 +250,7 @@ export function ScratchWorkspacePicker({
   }] : []
   const scratchEntries: MenuEntry[] = [{
       id: scratch?.workspaceId ?? SCRATCH,
-      label: scratch?.title ?? (busy ? text(t, 'picker.starting') : text(t, 'picker.scratch')),
+      label: scratch?.title ?? (busy ? text(t, 'picker.starting') : scratchTitle),
       icon: <IconSparkleRegular size={16} />,
       disabled: busy || (scratch === undefined && (lookingUpScratch || lookupFailed)),
     }]

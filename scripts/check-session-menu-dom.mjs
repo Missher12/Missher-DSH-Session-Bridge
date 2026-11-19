@@ -239,9 +239,10 @@ try {
   const anchor = document.createElement('button')
   document.body.appendChild(anchor)
   const picks = []
+  const scratchTitles = []
   let creations = 0
   let pickerLookups = 0
-  const scratchLabel = 'Outside a workspace (temp folder)…'
+  const scratchLabel = 'Outside a workspace'
   const rowLabels = () => [...document.querySelectorAll('[role=menuitem]')].map(node => node.textContent)
   async function picker(key, items, scratchId, selectedId, failure) {
     let nextFailure = failure
@@ -252,7 +253,11 @@ try {
       createWorkspace: async () => { throw new Error('normal adoption was not requested') },
       pickDirectory: async () => null,
       findScratchWorkspace: async () => { pickerLookups++; if (nextFailure) { const error = nextFailure; nextFailure = null; throw error }; return scratchId },
-      startScratchSession: async () => { creations++; return { workspaceId: scratchId ?? 'new-scratch' } },
+      startScratchSession: async title => {
+        scratchTitles.push(title)
+        creations++
+        return { workspaceId: scratchId ?? 'new-scratch' }
+      },
     }
     await act(async () => root.render(React.createElement(plugin.ScratchWorkspacePicker, props)))
   }
@@ -274,6 +279,7 @@ try {
   await act(async () => button(scratchLabel).click())
   assert.equal(creations, beforeFirstUse + 1)
   assert.equal(picks.at(-1), 'new-scratch')
+  assert.equal(scratchTitles.at(-1), scratchLabel, 'the scratch action and the selected workspace use the same name')
   await picker('lookup-error', [{ workspaceId: 'ordinary', title: 'Real project' }], null, undefined, new Error('Scratch lookup unavailable'))
   assert.ok(document.querySelector('[role=dialog]').textContent.includes('Scratch lookup unavailable'))
   await act(async () => button('Cancel').click())

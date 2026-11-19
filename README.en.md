@@ -6,7 +6,7 @@
 
 Display and copy complete session IDs, list/read/message other sessions, and create scratch workspaces in DeepSeek Harness.
 
-- `@missher/dsh-session-bridge` **1.0.10** supports bundled deletion and workspace drag on official DSH 0.2.2-rc.5.
+- `@missher/dsh-session-bridge` **1.0.11** supports bundled deletion and workspace drag on official DSH 0.2.2-rc.5.
 - Session identity lives in the left sidebar session menu; the header no longer shows an extra ID control.
 - The sidebar menu also copies the full ID, the working directory and the session reference; every row carries a confirmed delete entry and can be dragged onto a sidebar workspace.
 - An independently removable Cordis Bundle; no companion compatibility package is required. This is not an official DeepSeek product.
@@ -34,7 +34,7 @@ In the download directory, verify with `shasum -a 256 -c SHA256SUMS` on macOS or
 **Desktop:** open **Plugins → Add plugin** and select the local tarball or use the pinned URL below. Confirm the version and enabled `session-bridge` component. Reload as requested by the Host, or fully quit and reopen if required. Desktop owns its reserved `desktop` profile; use the application's plugin manager.
 
 The published URL follows the tag on the Release page:
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.10/missher-dsh-session-bridge-1.0.10.tgz`.
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.11/missher-dsh-session-bridge-1.0.11.tgz`.
 Until that asset exists, install from a local tarball's absolute path.
 
 **Web users with DSH CLI already installed:** install into your Web profile. This command does not modify Desktop's profile.
@@ -53,11 +53,11 @@ Open the target session’s three-dot menu in the left sidebar. The native copy-
 
 Actions use the selected row, including archived rows, without switching the current session. Missing directory information and clipboard failures produce feedback. “Delete session…” appears for ordinary and archived rows; dragging a session row onto a workspace header calls the same Host move transaction. A Host exposing `sessionController.deleteSession`/`moveSession` (or the legacy `deleteArchivedSession`) runs its own transaction after confirmation or a real drop. Unsupported Hosts show a disabled delete entry and the reason. Drag failures, running refusals and same-workspace drops are reported separately; a failed drop never shows success.
 
-### “Not in a workspace” and scratch
+### “Outside a workspace” and scratch
 
-The new-session workspace picker keeps its scratch entry directly below “Add workspace…”, including during lookup and retry. An existing scratch workspace appears only in that fixed position. Selecting it reuses a registered **`dsh-scratch` workspace**, with the default title “Not in a workspace.” On macOS the default canonical path is `/private/tmp/dsh-scratch`. It is still a **genuinely registered workspace** that simply carries that name — not a session without one, because the Host's blank-session input flow requires a workspace.
+The new-session workspace picker keeps “Outside a workspace” directly below “Add workspace…”, including during lookup and retry. An existing scratch workspace appears only in that fixed position. Selecting it reuses the registered **`dsh-scratch` workspace**. On macOS the default path is `/private/tmp/dsh-scratch`. The Host uses this workspace to start the new session.
 
-![The scratch entry at the end of the new-session workspace picker](docs/images/scratch-workspace-alpha2.png)
+![The scratch entry at the end of the new-session workspace picker in an earlier version](docs/images/scratch-workspace-alpha2.png)
 
 Opening the picker alone creates no directory or session. Repeated selection reuses the canonical path and workspace ID, preserves user renaming and does not merge unrelated workspaces with matching titles. If the OS removed the temporary directory, selecting it recreates the directory and reuses the saved registration; this does not recover files already removed by the OS. A symlink, a directory owned by another user, or one writable by the group/others is rejected for the fixed scratch location.
 

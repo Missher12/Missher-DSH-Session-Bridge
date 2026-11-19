@@ -6,7 +6,7 @@
 
 为 DeepSeek Harness 显示与复制完整会话 ID，提供跨会话查询、读取和投递，以及临时工作区。
 
-- 包名 `@missher/dsh-session-bridge`。**1.0.10** 在官方 DSH 0.2.2-rc.5 上可直接使用安全删除与拖放移动。
+- 包名 `@missher/dsh-session-bridge`。**1.0.11** 在官方 DSH 0.2.2-rc.5 上可直接使用安全删除与拖放移动。
 - 会话 ID 收在左侧会话的三点菜单里，顶部标题栏不再显示额外 ID 控件。
 - 左侧三点菜单可复制完整 ID、工作目录或 `/bridge` 引用；任何会话都有二次确认的“删除会话…”，可把会话行直接拖到侧栏目标工作区。
 - 独立、可卸载的 Cordis Bundle；不需要另装兼容插件。不是 DeepSeek 官方产品。
@@ -16,20 +16,20 @@
 
 ## 安装与更新
 
-从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.10，下载 `missher-dsh-session-bridge-1.0.10.tgz` 与 `SHA256SUMS`。版本与文件是否可下载以该页面为准。运行包包含编译结果，请用该安装包安装插件。
+从 [Releases 页面](https://github.com/Missher12/Missher-DSH-Session-Bridge/releases) 选择 1.0.11，下载 `missher-dsh-session-bridge-1.0.11.tgz` 与 `SHA256SUMS`。版本与文件是否可下载以该页面为准。运行包包含编译结果，请用该安装包安装插件。
 
 下载后可在包含两个文件的目录校验：macOS 用 `shasum -a 256 -c SHA256SUMS`，Linux 用 `sha256sum -c SHA256SUMS`。运行包已包含 `lib`，无需本地构建，也没有安装脚本。
 
 **Desktop：**打开“插件 → 添加插件”，选择本地 `.tgz` 或填写下面固定地址。确认版本及组件 `session-bridge` 已启用；按 Host 提示重新加载，必要时完全退出后重开。Desktop 的 `desktop` profile 由应用管理，使用应用内安装入口。
 
 发布地址以 Release 页面上的标签为准，格式为
-`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.10/missher-dsh-session-bridge-1.0.10.tgz`。
+`https://github.com/Missher12/Missher-DSH-Session-Bridge/releases/download/v1.0.11/missher-dsh-session-bridge-1.0.11.tgz`。
 在资产出现之前，请先用本地 tarball 的绝对路径安装。
 
 **已有 DSH CLI 的 Web 用户：**在自己的 Web profile 安装；以下命令不修改 Desktop profile。
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.10.tgz
+dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.11.tgz
 ```
 
 发布后把本地路径换成上面的固定地址即可。首次测试使用独立 `DSH_HOME` / `DSH_AGENTS_HOME`。不要同时启用旧 `dsh-session-bridge`、开发别名 `session-bridge-dev` 和当前 scoped 包；它们会重复注册 `session_list` 等工具。升级前保留旧包与配置，等当前任务结束再重新加载。
@@ -46,13 +46,13 @@ dsh plugin --profile web add /absolute/path/to/missher-dsh-session-bridge-1.0.10
 
 ### 「不在工作区」与 scratch
 
-新会话选择器中的“✨ 不在工作区（临时目录）…”固定紧跟在“添加工作区…”下方，已有的同一临时工作区也只在这里显示一次。加载时保留此位置；读取失败可重试，不把它混回普通工作区列表。选择后复用配置根目录下的 **`dsh-scratch` 工作区**，默认标题为“不在工作区”；macOS 的默认规范路径是 `/private/tmp/dsh-scratch`。它仍是**正式注册的工作区**，只是名字叫“不在工作区”，并不是真正无工作区的会话——宿主的 blank 会话输入流程需要工作区。
+新会话选择器中的“不在工作区”固定紧跟在“添加工作区…”下方，已有的同一临时工作区也只在这里显示一次。加载时保留此位置；读取失败可重试，不把它混回普通工作区列表。选择后复用配置根目录下的 **`dsh-scratch` 工作区**，默认标题为“不在工作区”；macOS 的默认规范路径是 `/private/tmp/dsh-scratch`。它仍是**正式注册的工作区**，只是名字叫“不在工作区”，并不是真正无工作区的会话——宿主的 blank 会话输入流程需要工作区。
 
 只打开选择器不会创建目录或会话。重复选择复用规范路径及真实工作区 ID，保留用户重命名；不合并其他同名项目。临时目录被系统清理后，再次选择会补回目录并沿用原注册；已经被清理的文件不会因此恢复。固定路径若是符号链接、非当前用户所有，或可被组/其他用户写入，创建请求会失败。
 
 选择器末尾的“不在工作区”入口：
 
-![新会话选择器末尾的“不在工作区（临时目录）”入口](docs/images/scratch-workspace-alpha2.png)
+![新会话选择器末尾的“不在工作区”入口位置，早期版本截图](docs/images/scratch-workspace-alpha2.png)
 
 模型工具 `session_scratch` 和 `/scratch` 则为每次调用建立独立的一次性目录；这与界面复用 `dsh-scratch` 的行为不同。临时目录可能被操作系统清理，不适合作为重要文件的唯一保存位置。
 
