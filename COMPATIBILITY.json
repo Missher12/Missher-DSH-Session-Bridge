@@ -1,7 +1,7 @@
 {
   "package": "@missher/dsh-session-bridge",
-  "packageVersion": "1.0.11",
-  "candidateStatus": "1.0.11 uses the default workspace title in the scratch picker. The reviewed lifecycle compositions from 1.0.10 continue to apply.",
+  "packageVersion": "1.0.12",
+  "candidateStatus": "1.0.12 closes the confirmation dialog when deletion starts and bounds the wait for a Host reply. The reviewed deletion backends continue to apply.",
   "hardHostVersionGate": false,
   "change": "Admit the exact rc.5 release after verifying the relevant owner implementations match rc.4. Keep existing writer, lineage, journal and index safeguards.",
   "currentChecks": {

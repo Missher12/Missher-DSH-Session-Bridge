@@ -66,7 +66,7 @@ try {
       })
     } }
   const sandbox = {
-    window: dom.window, document, navigator, console, setTimeout, clearTimeout, AbortController,
+    window: dom.window, document, navigator, console, setTimeout, clearTimeout, AbortController, AbortSignal,
     Node: dom.window.Node, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement,
     getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
     requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
@@ -137,8 +137,17 @@ try {
   await act(async () => button('Delete session…').click())
   await act(async () => button('Delete permanently').click())
   assert.equal(sends, 1)
-  assert.equal(button('Deleting…').disabled, true)
-  assert.equal(button('Cancel').disabled, true)
+  assert(!document.querySelector('[role=dialog]'), 'a slow deletion must release the modal')
+  assert.ok(document.body.textContent.includes('Deleting…'))
+  await act(async () => reopen())
+  await act(async () => button('Delete session…').click())
+  assert(!document.querySelector('[role=dialog]'), 'one deletion at a time')
+  await act(async () => reopen())
+  const copiesWhileDeleting = copied.length
+  await act(async () => button('Copy session ID').click())
+  assert.equal(copied.length, copiesWhileDeleting + 1)
+  assert.equal(copied.at(-1), 'archived', 'other sidebar actions still work while deletion waits')
+  assert.equal(sends, 1)
   await act(async () => {
     finish(Response.json({ ok: true, value: { sessionId: 'archived' } }))
     await Promise.resolve()
@@ -182,16 +191,9 @@ try {
   await act(async () => button('Delete session…').click())
   await act(async () => button('Delete permanently').click())
   await act(async () => finish(new Response('Unsupported', { status: 501 })))
-  const deleteDialog = document.querySelector('[role=dialog]')
-  console.log(JSON.stringify({ phase: 'post501', alerts: [...document.querySelectorAll('[role=alert]')].slice(0, 8)
-    .map(node => ({ inDeleteDialog: deleteDialog?.contains(node) ?? false, text: node.textContent.slice(0, 512) })) }))
-  assert.ok(deleteDialog, 'POST 501 must leave the deletion dialog open')
-  assert.ok(deleteDialog.querySelector('[role=alert]').textContent.includes('This Host cannot safely delete chat history'))
-  assert.equal(button('Delete permanently').disabled, true)
-  await act(async () => button('Delete permanently').click())
-  assert.equal(sends, sentBeforeProbes + 1, '501 blocks repeat confirmation')
-  await act(async () => button('Cancel').click())
   assert.equal(document.querySelector('[role=dialog]'), null)
+  assert.ok([...document.querySelectorAll('[role=alert]')].some(node => node.textContent.includes('This Host cannot safely delete chat history')))
+  assert.equal(sends, sentBeforeProbes + 1, '501 never retries deletion')
   const dragSource = document.createElement('div')
   dragSource.dataset.rowKey = 'session:drag-me'
   const sourceWorkspace = document.createElement('div')
@@ -368,7 +370,7 @@ try {
   const result = { status: 'passed', realReactAndPrimitives: true, builtPlugin: true, copiedSelectedRow: true,
     nativeRegistryAndRenderer: true, nativeGroupsAndIcons: true, nativeIdNotDuplicated: true,
     fullSessionIdVisible: true, fullSessionIdCopied: true, archiveReceiverPreserved: true,
-    confirmationBeforeSend: true, cancelDoesNotDelete: true, pendingBlocksRepeat: true, feedbackAfterMenuClose: true,
+    confirmationBeforeSend: true, cancelDoesNotDelete: true, pendingBlocksRepeat: true, sidebarUsableDuringDelete: true, feedbackAfterMenuClose: true,
     unsupportedVisibleAndDisabled: true, failedProbeDistinct: true, staleProbeIgnored: true,
     reopenChecksCapability: true, text501VisibleAndBlocksRepeat: true,
     scratchPickerSingleEntry: true, scratchIdentitySurvivesRename: true, sameTitleProjectPreserved: true,

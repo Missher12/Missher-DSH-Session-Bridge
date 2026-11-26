@@ -5,6 +5,8 @@ import { en } from './locales.js'
 import type { SessionBridgeKey } from './locales.js'
 import type { SessionListReader } from './session-menu.js'
 
+const DELETE_REPLY_TIMEOUT_MS = 20_000
+
 interface DeleteState {
   readonly sessionId: string
   readonly pending: boolean
@@ -56,13 +58,14 @@ export function createSessionDeleteActions(send: typeof fetch = fetch, onDeleted
     dismiss() { if (!state?.pending) publish(null) },
     dispose() { disposed = true; listeners.clear(); state = null },
     async confirm(): Promise<void> {
-      if (disposed || state === null || state.pending || state.done || state.error === 'delete.unsupported') return
+      if (disposed || state === null || state.pending || state.done || state.error !== undefined) return
       const { sessionId } = state
       publish({ sessionId, pending: true, done: false })
       try {
         const response = await send(SESSION_DELETE_PATH.slice(1), {
           method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId, confirmed: true }),
+          signal: AbortSignal.timeout(DELETE_REPLY_TIMEOUT_MS),
         })
         // Capability can disappear between opening the menu and confirming.
         // A 501 remains explicit even when an older Host returns a text body.
@@ -87,8 +90,13 @@ export function createSessionDeleteActions(send: typeof fetch = fetch, onDeleted
           return
         }
         publish({ sessionId, pending: false, done: true })
-        try { onDeleted?.() } catch { /* a refresh failure must not undo a committed deletion */ }
-      } catch { publish({ sessionId, pending: false, done: false, error: 'delete.failed' }) }
+        if (!disposed) {
+          try { onDeleted?.() } catch { /* a refresh failure must not undo a committed deletion */ }
+        }
+      } catch {
+        // The Host may have accepted the request before the reply was lost.
+        publish({ sessionId, pending: false, done: false, error: 'delete.unconfirmed' })
+      }
     },
   }
 }
@@ -140,16 +148,19 @@ export function SessionDeleteDialog({ deleteActions, t }: { deleteActions: Delet
   const state = useSyncExternalStore(deleteActions.subscribe, deleteActions.getSnapshot)
   const tr = t ?? ((key: SessionBridgeKey) => en[key])
   if (state === null) return null
-  if (state.done) return <Toast text={tr('delete.done')} tone="success" onDone={deleteActions.dismiss} />
+  if (state.pending) {
+    return <Toast key="pending" text={tr('delete.pending')} holdMs={DELETE_REPLY_TIMEOUT_MS} onDone={deleteActions.dismiss} />
+  }
+  if (state.done) return <Toast key="done" text={tr('delete.done')} tone="success" onDone={deleteActions.dismiss} />
+  if (state.error !== undefined) {
+    return <Toast key="error" text={tr(state.error)} holdMs={8000} onDone={deleteActions.dismiss} />
+  }
   return <Modal open title={tr('delete.title')} closeLabel={tr('panel.close')}
     description={tr('delete.description')} onClose={deleteActions.dismiss}
     footer={<>
-      <Button variant="outline" disabled={state.pending} data-modal-autofocus onClick={deleteActions.dismiss}>{tr('picker.cancel')}</Button>
-      <Button variant="primary" disabled={state.pending || state.error === 'delete.unsupported'} onClick={() => { void deleteActions.confirm() }}>
-        {tr(state.pending ? 'delete.pending' : 'delete.confirm')}
-      </Button>
+      <Button variant="outline" data-modal-autofocus onClick={deleteActions.dismiss}>{tr('picker.cancel')}</Button>
+      <Button variant="primary" onClick={() => { void deleteActions.confirm() }}>{tr('delete.confirm')}</Button>
     </>}>
     <code className="dsh-sb-deleteSessionId">{state.sessionId}</code>
-    {state.error !== undefined && <p className="dsh-sb-deleteError" role="alert">{tr(state.error)}</p>}
   </Modal>
 }

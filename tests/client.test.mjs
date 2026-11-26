@@ -222,7 +222,7 @@ it('requests confirmation for any session; cancel never sends a deletion', async
   assert.equal(requests, 0)
 })
 
-it('sends the exact confirmed identity once and leaves a busy dialog open until settled', async () => {
+it('sends the exact confirmed identity once and rejects another deletion while waiting', async () => {
   let finish
   let requests = 0
   const actions = client.createSessionDeleteActions(async (path, options) => {
@@ -234,13 +234,41 @@ it('sends the exact confirmed identity once and leaves a busy dialog open until 
   })
   actions.request('ordinary')
   const pending = actions.confirm()
+  actions.request('other')
   await actions.confirm()
   actions.dismiss()
   assert.equal(actions.getSnapshot().pending, true)
+  assert.equal(actions.getSnapshot().sessionId, 'ordinary')
   assert.equal(requests, 1)
   finish(Response.json({ ok: true, value: { sessionId: 'ordinary' } }))
   await pending
   assert.equal(actions.getSnapshot().done, true)
+})
+
+it('stops waiting when the deletion reply is late without reporting success or retrying', async t => {
+  const deadline = new AbortController()
+  t.mock.method(AbortSignal, 'timeout', () => deadline.signal)
+  let requests = 0
+  let refreshes = 0
+  const actions = client.createSessionDeleteActions(async (_path, { signal }) => {
+    requests++
+    assert.equal(signal, deadline.signal)
+    return await new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  }, () => { refreshes++ })
+  actions.request('ordinary')
+  const pending = actions.confirm()
+  deadline.abort()
+  await pending
+  assert.equal(actions.getSnapshot().pending, false)
+  assert.equal(actions.getSnapshot().error, 'delete.unconfirmed')
+  await actions.confirm()
+  assert.equal(requests, 1)
+  assert.equal(refreshes, 0)
+  actions.request('other')
+  assert.equal(actions.getSnapshot().sessionId, 'other')
+  assert.equal(actions.getSnapshot().error, undefined)
 })
 
 it('keeps Host failures explicit and suppresses late feedback after unload', async () => {

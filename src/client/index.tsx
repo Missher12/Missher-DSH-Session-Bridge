@@ -72,7 +72,6 @@ const STYLES = `
   white-space: normal; overflow-wrap: anywhere;
 }
 .dsh-sb-deleteSessionId { display: block; padding: 10px 12px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: 13px/1.6 ui-monospace, SFMono-Regular, monospace; overflow-wrap: anywhere; }
-.dsh-sb-deleteError { color: var(--dsw-alias-state-error-primary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .dsh-sb-drop-target { outline: 2px solid var(--dsw-alias-brand-primary, #4f7cff); outline-offset: -2px; border-radius: 6px; }
 /*
  * One line, never shortened, always reachable.
